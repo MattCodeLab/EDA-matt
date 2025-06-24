@@ -48,7 +48,7 @@ inflation = inflation.sort_values(by='date', ascending=True)
 fig, ax1 = plt.subplots(figsize=(12, 6))
 
 # Create the bar chart on the first axis (left y-axis)
-ax1.bar(inflation['date'], inflation['Headline CPI Year-on-Year Growth %'], color='lightsalmon', label='Headline CPI Year-on-Year Growth %')
+ax1.plot(inflation['date'], inflation['Headline CPI Year-on-Year Growth %'], color='grey', marker='o', linestyle='-', label='Headline CPI Year-on-Year Growth %')
 ax1.set_ylabel('Headline CPI Year-on-Year Growth %', color='black')
 ax1.tick_params(axis='y', labelcolor='black')
 ax1.set_xlabel('Date', color='black')
@@ -57,7 +57,7 @@ ax1.set_xlabel('Date', color='black')
 ax2 = ax1.twinx()
 
 # Create the line chart on the second axis (right y-axis)
-ax2.plot(inflation['date'], inflation['Core CPI Year-on-Year Growth %'], color='navy', marker='o', linestyle='-', label='Core CPI Year-on-Year Growth %')
+ax2.plot(inflation['date'], inflation['Core CPI Year-on-Year Growth %'], color='black', marker='o', linestyle='-', label='Core CPI Year-on-Year Growth %')
 ax2.set_ylabel('Core CPI Year-on-Year Growth %', color='black')
 ax2.tick_params(axis='y', labelcolor='black')
 
