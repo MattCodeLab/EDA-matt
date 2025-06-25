@@ -27,11 +27,6 @@ infdata['date'] = pd.to_datetime(infdata['date'])
 infdata = infdata[infdata['division']== 'overall']
 infdata = infdata[['date', 'inflation_yoy']]
 
-# # Manually imputing data, as the latest datapoint is not reflected in the API yet
-# infdata_new = pd.DataFrame({'date': ['2025-04'], 'inflation_yoy': [1.4]})
-# infdata = pd.concat([infdata, infdata_new], ignore_index=True)
-# infdata = infdata.sort_values(by='date', ascending=False)
-
 # Renaming the column
 infdata = infdata.rename(columns={'inflation_yoy': 'Headline CPI YoY %'})
 
@@ -46,15 +41,16 @@ inflation = inflation.sort_values(by='date', ascending=True)
 fig, ax1 = plt.subplots(figsize=(6, 6))
 
 # Plot the two lines
-ax1.plot(inflation['date'], inflation['Headline CPI YoY %'], color='red', marker='o', label='Headline CPI (YoY) %')
+ax1.plot(inflation['date'], inflation['Headline CPI YoY %'], color='red', marker='o', label='Headline CPI YoY (%)')
 ax2 = ax1.twinx()
-ax2.plot(inflation['date'], inflation['Core CPI YoY %'], color='black', marker='o', linestyle = '--', label='Core CPI (YoY) %')
+ax2.plot(inflation['date'], inflation['Core CPI YoY %'], color='black', marker='o', linestyle = '--', label='Core CPI YoY (%)')
 
 # Set y-label
-ax1.set_ylabel('YoY Changes %', color='#5a5a5a')
+ax1.set_ylabel('Headline CPI YoY (%)', color='red')
+ax2.set_ylabel('Core CPI YoY (%)', color='black')
 
 # Set title
-ax1.set_title('Headline vs Core CPI (YoY) (As at May 2025)', fontsize=20, color='#5a5a5a')
+ax1.set_title('YoY Inflation: May 2025', fontsize=14, color='black')
 
 # Combine legends from both axes
 lines, labels = ax1.get_legend_handles_labels()
@@ -66,8 +62,9 @@ for ax in [ax1, ax2]:
     for spine in ax.spines.values():
         spine.set_edgecolor('#cecece')
 
-# No x-axis title
-ax1.set_xlabel('')
+# Set top spine to white for both axes
+for ax in [ax1, ax2]:
+    ax.spines['top'].set_color('white')
 
 # Set grid lines
 ax1.yaxis.grid(color='grey', linestyle='--', linewidth=0.5, alpha=0.7)

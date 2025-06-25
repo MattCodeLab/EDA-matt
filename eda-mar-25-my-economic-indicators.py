@@ -38,14 +38,15 @@ for col in meidata_cols_12m[1:]:
 fig, ax = plt.subplots(figsize=(6, 6))
 
 # Plot the two lines
-ax.plot(meidata_yoy_12m['date'], meidata_yoy_12m['leading_yoy'], color='red', marker='o', label='Leading YoY')
-ax.plot(meidata_yoy_12m['date'], meidata_yoy_12m['coincident_yoy'], color='black', marker='o', linestyle = '--', label='Coincident YoY')
+ax.plot(meidata_yoy_12m['date'], meidata_yoy_12m['leading_yoy'], color='red', marker='o', label='Leading YoY (%)')
+ax.plot(meidata_yoy_12m['date'], meidata_yoy_12m['coincident_yoy'], color='black', marker='o', linestyle = '--', label='Coincident YoY (%)')
 
 # Set y-label
-ax.set_ylabel('YoY Changes %', color='#5a5a5a')
+ax.set_ylabel('YoY Changes (%)', color='#5a5a5a')
+ax.set_xlabel('', color='#5a5a5a')
 
 # Set title
-ax.set_title('Malaysian Economic Indicators April 2025', fontsize=20, color='#5a5a5a')
+ax.set_title('Economic Indicators: April 2025', fontsize=14, color='black')
 
 # Set legend at bottom left
 ax.legend(loc='lower left', frameon=True)
@@ -54,8 +55,8 @@ ax.legend(loc='lower left', frameon=True)
 for spine in ax.spines.values():
     spine.set_edgecolor('#cecece')
 
-# No x-axis title
-ax.set_xlabel('')
+ax.spines['top'].set_color('white')
+ax.spines['right'].set_color('white')
 
 # Set grid lines
 ax.yaxis.grid(color='grey', linestyle='--', linewidth=0.5, alpha=0.7)
