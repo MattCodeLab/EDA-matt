@@ -1,0 +1,7 @@
+name,links,source
+IPI,https://api.data.gov.my/data-catalogue?id=ipi,DOSM
+WRT,https://api.data.gov.my/data-catalogue?id=iowrt,DOSM
+BTS,https://storage.dosm.gov.my/bts/,DOSM
+MEI,https://api.data.gov.my/data-catalogue?id=economic_indicators,DOSM
+CORE_CPI,https://api.data.gov.my/data-catalogue?id=cpi_core_inflation,DOSM
+HEADLINE_CPI,https://api.data.gov.my/data-catalogue?id=cpi_headline_inflation,DOSM
