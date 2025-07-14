@@ -1,2 +1,3 @@
 name,links,source
 IPI,https://storage.dosm.gov.my/ipi/ipi.parquet,DOSM
+WRT,https://storage.dosm.gov.my/iowrt/iowrt.parquet,DOSM
