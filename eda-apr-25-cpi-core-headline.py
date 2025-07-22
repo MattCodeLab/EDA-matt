@@ -50,7 +50,7 @@ ax1.set_ylabel('Headline CPI YoY (%)', color='red')
 ax2.set_ylabel('Core CPI YoY (%)', color='black')
 
 # Set title
-ax1.set_title('YoY Inflation: May 2025', fontsize=14, color='black')
+ax1.set_title('YoY Inflation: June 2025', fontsize=14, color='black')
 
 # Combine legends from both axes
 lines, labels = ax1.get_legend_handles_labels()
