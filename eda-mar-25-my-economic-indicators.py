@@ -28,7 +28,7 @@ meidata_cols_yoy_12m = meidata_yoy_12m.columns.tolist()
 for col in meidata_cols_yoy_12m[1:]:
     meidata_yoy_12m[col] = meidata_yoy_12m[col].round(1)
 
-meidata_12m = meidata[meidata['date']>'2024-03-01']
+meidata_12m = meidata[meidata['date']>'2024-04-01']
 meidata_12m = meidata_12m.sort_values(by='date', ascending=True).reset_index(drop=True)
 meidata_cols_12m = meidata_12m.columns.tolist()
 # Convert the data to 1 decimal place, except for the date
@@ -46,7 +46,7 @@ ax.set_ylabel('YoY Changes (%)', color='#5a5a5a')
 ax.set_xlabel('', color='#5a5a5a')
 
 # Set title
-ax.set_title('Economic Indicators: April 2025', fontsize=14, color='black')
+ax.set_title('Economic Indicators: May 2025', fontsize=14, color='black')
 
 # Set legend at bottom left
 ax.legend(loc='lower left', frameon=True)
