@@ -21,7 +21,7 @@ cols_to_keep = ['date', 'leading_yoy', 'coincident_yoy']
 meidata_yoy = meidata_yoy[cols_to_keep]
 meidata_yoy = meidata_yoy.sort_values('date', ascending=True).reset_index(drop=True)
 
-meidata_yoy_12m = meidata_yoy[meidata_yoy['date']>'2024-03-01']
+meidata_yoy_12m = meidata_yoy[meidata_yoy['date']>'2024-04-01']
 meidata_yoy_12m = meidata_yoy_12m.sort_values(by='date', ascending=True).reset_index(drop=True)
 meidata_cols_yoy_12m = meidata_yoy_12m.columns.tolist()
 # Convert the data to 1 decimal place, except for the date
