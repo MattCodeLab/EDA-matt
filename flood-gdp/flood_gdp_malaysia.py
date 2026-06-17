@@ -992,8 +992,15 @@ def create_static_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
 # ▌ TABLE FIGURE
 # ===========================================================================
 
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.colors as mc
+from pathlib import Path
+
 def create_table_figure(exposure_df: pd.DataFrame) -> Path:
-    fig, ax = plt.subplots(figsize=(18, 5.5), facecolor="white")
+    # 1. We start with a slightly larger height buffer to accommodate 
+    # potential text wrapping or auto-scaling.
+    fig, ax = plt.subplots(figsize=(18, 6.0), facecolor="white")
     ax.set_axis_off()
 
     cols = [
@@ -1017,33 +1024,52 @@ def create_table_figure(exposure_df: pd.DataFrame) -> Path:
             f"{row['Δ Exposed (USD B)']:+.1f}",
         ])
 
-    tbl = ax.table(cellText=rows, colLabels=cols, cellLoc="center",
-                   loc="center", bbox=[0, 0, 1, 1])
+    # 2. Removed bbox=[0,0,1,1] so auto_set_column_width can scale columns freely.
+    tbl = ax.table(cellText=rows, colLabels=cols, cellLoc="center", loc="center")
+    
+    # 3. CRITICAL: Automatically scale columns based on the text length
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(9)
+    tbl.auto_set_column_width(col=list(range(len(cols)))) 
 
+    # 4. Prevent vertical clipping by adding extra internal padding to the cells
+    # and forcing the text to wrap if it exceeds boundaries.
+    for cell in tbl.values():
+        cell.set_height(0.06)  # Generous row height scale (adjust as needed)
+        cell.get_text().set_wrap(True)
+
+    # Apply Header Styling
     for j in range(len(cols)):
         c = tbl[(0, j)]
-        c.set_facecolor("#1A252F"); c.set_text_props(color="white", fontweight="bold")
+        c.set_facecolor("#1A252F")
+        c.set_text_props(color="white", fontweight="bold")
 
+    # Apply Data Row Styling
     for i, (_, row) in enumerate(exposure_df.iterrows(), start=1):
         hi = mc.to_rgba(_exposure_color(row["Exposure share (%)"]), alpha=0.26)
         bg = "#FAFAFA" if i % 2 != 0 else "#F0F0F0"
         for j in range(len(cols)):
-            c = tbl[(i, j)]; c.set_facecolor(bg); c.set_edgecolor("#D0D0D0")
-        tbl[(i, 6)].set_facecolor(hi); tbl[(i, 7)].set_facecolor(hi)
+            c = tbl[(i, j)]
+            c.set_facecolor(bg)
+            c.set_edgecolor("#D0D0D0")
+        tbl[(i, 6)].set_facecolor(hi)
+        tbl[(i, 7)].set_facecolor(hi)
 
     ax.set_title(
         f"Malaysia Industrial Cluster Flood-Weighted Economic Exposure  "
         f"(RP{HEADLINE_RP} present + 2050 RCP8.5)",
-        fontsize=12, fontweight="bold", color="#1A252F", pad=8,
+        fontsize=12, fontweight="bold", color="#1A252F", pad=12,
     )
-    fig.text(0.5, 0.02,
+    
+    fig.text(0.5, 0.01,
              "Sources: DOSM 2022 (GDP) · WRI Aqueduct v2 (depth-damage) · "
              "Kummu et al. 2025 Scientific Data 12:567 (methodology)",
              ha="center", fontsize=7.5, color="#777")
 
     out = OUTPUT_DIR / "exposure_table_figure.png"
+    # 5. Using bbox_inches="tight" with a tight_layout pass ensures everything 
+    # fits beautifully in the saved file.
+    plt.tight_layout()
     fig.savefig(out, dpi=180, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     log.info(f"  Table figure → {out}")
