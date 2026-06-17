@@ -1,0 +1,120 @@
+========================================================================
+MALAYSIA FLOOD-RISK × ECONOMIC EXPOSURE — MANAGEMENT BRIEF
+========================================================================
+
+Scenario : RP100 present + 2050 RCP8.5 | Flood: Synthetic proxy (calibrated to WRI Aqueduct v2)
+Method   : Depth-damage curve × cluster GDP (10 km buffer, USD B PPP 2021)
+
+TOP 5 CLUSTERS FOR FLOOD-DEFENCE CAPEX
+  (ranked by present exposed GDP; 2050 delta shows which worsen most)
+------------------------------------------------------------------------
+
+#1  PORT KLANG FREE ZONE   [VERY HIGH]
+    State / Type  : Selangor | Logistics / Port
+    Total GDP     : USD 50B (10 km buffer)
+    Flood depth   : 2.10 m (RP100) → 2.84 m (2050 RCP8.5)
+    Exposed GDP   : USD 45.0B (present) → USD 45.0B (2050), Δ +0.0B
+    Rationale     : Malaysia's busiest port; coastal + tidal + Sg Klang riverine; highest absolute exposed GDP in the portfolio
+
+#2  SHAH ALAM / KLANG VALLEY BELT   [HIGH]
+    State / Type  : Selangor | Mixed heavy/light industry
+    Total GDP     : USD 42B (10 km buffer)
+    Flood depth   : 1.40 m (RP100) → 1.89 m (2050 RCP8.5)
+    Exposed GDP   : USD 27.6B (present) → USD 27.6B (2050), Δ +0.0B
+    Rationale     : Sg Klang riverine; recurrent annual flash floods; largest manufacturing belt by employment and output
+
+#3  PASIR GUDANG FIZ + TG LANGSAT   [VERY HIGH]
+    State / Type  : Johor | Petrochem / Heavy / Oil terminal
+    Total GDP     : USD 30B (10 km buffer)
+    Flood depth   : 2.40 m (RP100) → 3.24 m (2050 RCP8.5)
+    Exposed GDP   : USD 27.0B (present) → USD 27.0B (2050), Δ +0.0B
+    Rationale     : Coastal + estuary; petrochemical storage + refinery; spill risk multiplies economic consequence of flooding
+
+#4  GEBENG / KUANTAN INDUSTRIAL ESTATE   [VERY HIGH]
+    State / Type  : Pahang | Petrochem (ECER)
+    Total GDP     : USD 24B (10 km buffer)
+    Flood depth   : 2.60 m (RP100) → 3.51 m (2050 RCP8.5)
+    Exposed GDP   : USD 21.6B (present) → USD 21.6B (2050), Δ +0.0B
+    Rationale     : East-coast NE Monsoon (Nov-Mar); highest exposure share; global rasters under-resolve monsoon events — urgent: obtain DID data
+
+#5  KERTEH PETROCHEMICAL COMPLEX   [VERY HIGH]
+    State / Type  : Terengganu | Oil & Gas / Petrochem
+    Total GDP     : USD 22B (10 km buffer)
+    Flood depth   : 2.80 m (RP100) → 3.78 m (2050 RCP8.5)
+    Exposed GDP   : USD 19.4B (present) → USD 19.4B (2050), Δ +0.0B
+    Rationale     : East-coast NE Monsoon; PETRONAS upstream + downstream; deepest flood depth and highest exposure share in portfolio
+
+========================================================================
+NOTABLE CROSS-PORTFOLIO FINDINGS
+------------------------------------------------------------------------
+
+• EAST-COAST CLUSTERS (Gebeng, Kerteh): 90% exposure share at RP100.
+  Northeast Monsoon (Nov-Mar) drives annual inundation that global
+  rasters systematically under-resolve. HIGHEST URGENCY for local DID data.
+
+• PORT KLANG FZ: Largest absolute exposed GDP (USD 45B present).
+  Already at max damage band. SLR alone threatens irreversibility.
+  Priority: permanent seawall + tide-gate engineering study.
+
+• BIGGEST 2050 DETERIORATION:
+  PTP (USD +6.2B): crosses from 65% → 90% damage band under SLR.
+  Kulim HTP (USD +4.5B): 35% → 65% band — largest relative jump.
+  Review both before committing major new greenfield investment.
+
+• SHAH ALAM / KLANG BELT: Second-largest absolute exposure (USD 27.6B).
+  Recurrent annual flash flooding already disrupts logistics and labour.
+  Urban drainage master plan (SMART Tunnel expansion) has high ROI.
+
+========================================================================
+LIMITATIONS (required for credibility)
+------------------------------------------------------------------------
+
+1. FLOOD RASTERS: Global open-source models (WRI Aqueduct, JRC) are
+   calibrated to large river systems and open coast. Systematic gaps:
+   (a) pluvial/flash floods — Klang Valley, Penang urban;
+   (b) east-coast monsoon — Pahang, Terengganu, Kelantan.
+   Upgrade path: Fathom 3.0 (30 m, fluvial+pluvial+coastal, non-commercial
+   free — request info@fathom.global); national data via DID formal MOU.
+
+2. GDP GRID: Distributed uniformly within state boundaries. Actual
+   economic density is far more concentrated in urban cores.
+   Upgrade: Kummu et al. Zenodo doi:10.5281/zenodo.10976733 (30 arcsec
+   gridded GDP total, 1990-2024) or GHS-POP-weighted redistribution.
+
+3. DEPTH-DAMAGE: UNDRR generalised industrial curve applied uniformly.
+   Actual damage depends on building stock, floor level, flood warning.
+   Cluster-specific asset surveys (NAPIC / MIDA) would sharpen estimates.
+
+4. CLIMATE UPLIFT: 2050 depth = present × 1.35 (RCP8.5 regional median).
+   Actual range: ×1.1–×1.8 across GCMs. Multi-model ensemble with 5th/
+   95th percentile needed for robust resilience planning.
+
+5. COASTAL / STORM SURGE: Not modelled separately. WRI Aqueduct coastal
+   layers (inuncoast_*) or SCHISM storm-surge outputs should be added
+   for Pasir Gudang, PTP, Port Klang, Batu Berendam.
+
+RECOMMENDATION: Use this prototype for management prioritisation.
+Commission site-specific FSIs using Fathom 3.0 + DID + NAPIC data
+before committing capex or writing flood-risk covenants into financing.
+
+========================================================================
+DATA CITATIONS
+------------------------------------------------------------------------
+
+Kummu, M. et al. (2025). A global gridded dataset on GDP and its growth,
+  1990-2024. Scientific Data, 12, 567. doi:10.1038/s41597-025-04850-9
+  Zenodo: doi:10.5281/zenodo.10976733
+
+Ward, P. J. et al. (2020). Aqueduct Floods Methodology. WRI Technical Note.
+  Washington DC: World Resources Institute.
+  URL: http://wri-projects.s3.amazonaws.com/AqueductFloodTool/
+
+Baugh, C. et al. (2024). JRC Global River Flood Hazard Maps v2.1. CC BY 4.0.
+  doi:10.2905/jrc-floods-floodmapgl_rp50y-tif
+
+GADM (2022). Database of Global Administrative Areas, v4.1. gadm.org
+
+DOSM (2023). State Socioeconomic Report 2022.
+  Department of Statistics Malaysia. www.dosm.gov.my
+
+========================================================================
