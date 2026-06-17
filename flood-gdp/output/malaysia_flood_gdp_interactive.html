@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_6b1569ea2b0308f04d39066f6d6d6b78 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+    <div style='position:fixed;bottom:30px;left:30px;z-index:1000;
+                background:white;padding:12px 16px;border-radius:8px;
+                box-shadow:0 2px 8px rgba(0,0,0,0.25);font-family:Arial;font-size:12px'>
+      <b style='font-size:13px'>Flood Exposure Share (RP100)</b><br>
+      <span style='color:#C0392B'>&#9679;</span> ≥85% &mdash; Very High<br>
+      <span style='color:#E67E22'>&#9679;</span> 60–85% &mdash; High<br>
+      <span style='color:#F1C40F'>&#9679;</span> 30–60% &mdash; Medium<br>
+      <span style='color:#27AE60'>&#9679;</span> &lt;30% &mdash; Lower<br>
+      <span style='color:#888;font-size:11px'>Circle size ∝ total GDP</span><br>
+      <hr style='margin:6px 0'>
+      <span style='color:#AA4444;font-size:10px'>
+        ⚠ Prototype — synthetic flood model<br>
+        Upgrade: WRI Aqueduct / Fathom 3.0
+      </span>
+    </div>
+    
+    
+            <div class="folium-map" id="map_6b1569ea2b0308f04d39066f6d6d6b78" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_6b1569ea2b0308f04d39066f6d6d6b78 = L.map(
+                "map_6b1569ea2b0308f04d39066f6d6d6b78",
+                {
+                    center: [4.5, 108.5],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 6,
+  "zoomControl": true,
+  "preferCanvas": true,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_4d09083e884663a8a7303f96d9fa8f09 = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_4d09083e884663a8a7303f96d9fa8f09.addTo(map_6b1569ea2b0308f04d39066f6d6d6b78);
+        
+    
+            var feature_group_fcfb473624f4e6fa6389f0773ddf2235 = L.featureGroup(
+                {
+}
+            );
+        
+    
+            var circle_marker_fd0651b7249c069ea11d540ff06fcc10 = L.circleMarker(
+                [2.998, 101.392],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#C0392B", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 31.0, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_8b6f8144c6b7e182012746906a14876a = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_b8da944aed2962db70a9dfa0110eaa55 = $(`<div id="html_b8da944aed2962db70a9dfa0110eaa55" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Port Klang Free Zone</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Selangor &nbsp; <b>Type:</b> Logistics / Port<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 50.0 B<br>           <b>Flood depth RP100:</b> 2.10 m<br>           <b>Damage factor:</b> 90%<br>           <b>Exposed GDP (present):</b>             <span style='color:#C0392B;font-weight:bold'>               USD 45.0 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 45.0 B             (<b>+0.0 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>Malaysia's busiest port; coastal + tidal + Sg Klang riverine; highest absolute exposed GDP in the portfolio</i>         </div>         </div>`)[0];
+                popup_8b6f8144c6b7e182012746906a14876a.setContent(html_b8da944aed2962db70a9dfa0110eaa55);
+            
+        
+
+        circle_marker_fd0651b7249c069ea11d540ff06fcc10.bindPopup(popup_8b6f8144c6b7e182012746906a14876a)
+        ;
+
+        
+    
+    
+            circle_marker_fd0651b7249c069ea11d540ff06fcc10.bindTooltip(
+                `<div>
+                     <b>Port Klang Free Zone</b><br>Exposed: USD 45.0B (90%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_76bacc04775120aa60ecf639ce2b1c22 = L.circleMarker(
+                [3.05, 101.52],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#E67E22", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 27.7, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_6bff7f9b372a6eff598b6dad6dd0b154 = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_64aed09408ab1cf429d492c4a845c084 = $(`<div id="html_64aed09408ab1cf429d492c4a845c084" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Shah Alam / Klang Valley Belt</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Selangor &nbsp; <b>Type:</b> Mixed heavy/light industry<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 42.5 B<br>           <b>Flood depth RP100:</b> 1.40 m<br>           <b>Damage factor:</b> 65%<br>           <b>Exposed GDP (present):</b>             <span style='color:#E67E22;font-weight:bold'>               USD 27.6 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 27.6 B             (<b>+0.0 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>Sg Klang riverine; recurrent annual flash floods; largest manufacturing belt by employment and output</i>         </div>         </div>`)[0];
+                popup_6bff7f9b372a6eff598b6dad6dd0b154.setContent(html_64aed09408ab1cf429d492c4a845c084);
+            
+        
+
+        circle_marker_76bacc04775120aa60ecf639ce2b1c22.bindPopup(popup_6bff7f9b372a6eff598b6dad6dd0b154)
+        ;
+
+        
+    
+    
+            circle_marker_76bacc04775120aa60ecf639ce2b1c22.bindTooltip(
+                `<div>
+                     <b>Shah Alam / Klang Valley Belt</b><br>Exposed: USD 27.6B (65%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_b8db2c4616d1620343d859bc53ef1234 = L.circleMarker(
+                [1.471, 103.901],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#C0392B", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 22.2, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_50a6e16aa1beddd499b29d5ebd60b4bc = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_9727546abd109508578dcef2e474ce2f = $(`<div id="html_9727546abd109508578dcef2e474ce2f" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Pasir Gudang FIZ + Tg Langsat</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Johor &nbsp; <b>Type:</b> Petrochem / Heavy / Oil terminal<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 30.0 B<br>           <b>Flood depth RP100:</b> 2.40 m<br>           <b>Damage factor:</b> 90%<br>           <b>Exposed GDP (present):</b>             <span style='color:#C0392B;font-weight:bold'>               USD 27.0 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 27.0 B             (<b>+0.0 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>Coastal + estuary; petrochemical storage + refinery; spill risk multiplies economic consequence of flooding</i>         </div>         </div>`)[0];
+                popup_50a6e16aa1beddd499b29d5ebd60b4bc.setContent(html_9727546abd109508578dcef2e474ce2f);
+            
+        
+
+        circle_marker_b8db2c4616d1620343d859bc53ef1234.bindPopup(popup_50a6e16aa1beddd499b29d5ebd60b4bc)
+        ;
+
+        
+    
+    
+            circle_marker_b8db2c4616d1620343d859bc53ef1234.bindTooltip(
+                `<div>
+                     <b>Pasir Gudang FIZ + Tg Langsat</b><br>Exposed: USD 27.0B (90%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_b761919626b11465cd4ef6c4fb0d3ff9 = L.circleMarker(
+                [3.97, 103.38],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#C0392B", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 19.56, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_a9924c38c492247dc346572a034e2552 = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_22cd01041a300bfd4386da1722a40258 = $(`<div id="html_22cd01041a300bfd4386da1722a40258" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Gebeng / Kuantan Industrial Estate</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Pahang &nbsp; <b>Type:</b> Petrochem (ECER)<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 24.0 B<br>           <b>Flood depth RP100:</b> 2.60 m<br>           <b>Damage factor:</b> 90%<br>           <b>Exposed GDP (present):</b>             <span style='color:#C0392B;font-weight:bold'>               USD 21.6 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 21.6 B             (<b>+0.0 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>East-coast NE Monsoon (Nov-Mar); highest exposure share; global rasters under-resolve monsoon events — urgent: obtain DID data</i>         </div>         </div>`)[0];
+                popup_a9924c38c492247dc346572a034e2552.setContent(html_22cd01041a300bfd4386da1722a40258);
+            
+        
+
+        circle_marker_b761919626b11465cd4ef6c4fb0d3ff9.bindPopup(popup_a9924c38c492247dc346572a034e2552)
+        ;
+
+        
+    
+    
+            circle_marker_b761919626b11465cd4ef6c4fb0d3ff9.bindTooltip(
+                `<div>
+                     <b>Gebeng / Kuantan Industrial Estate</b><br>Exposed: USD 21.6B (90%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_7573c4e8f69773b5593b26d6145fe8f6 = L.circleMarker(
+                [4.52, 103.45],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#C0392B", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 18.46, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_bf4affae0f89026cd8040627feb63c9c = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_57061de732969dea3c5a032c3f088593 = $(`<div id="html_57061de732969dea3c5a032c3f088593" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Kerteh Petrochemical Complex</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Terengganu &nbsp; <b>Type:</b> Oil & Gas / Petrochem<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 21.5 B<br>           <b>Flood depth RP100:</b> 2.80 m<br>           <b>Damage factor:</b> 90%<br>           <b>Exposed GDP (present):</b>             <span style='color:#C0392B;font-weight:bold'>               USD 19.4 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 19.4 B             (<b>+0.0 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>East-coast NE Monsoon; PETRONAS upstream + downstream; deepest flood depth and highest exposure share in portfolio</i>         </div>         </div>`)[0];
+                popup_bf4affae0f89026cd8040627feb63c9c.setContent(html_57061de732969dea3c5a032c3f088593);
+            
+        
+
+        circle_marker_7573c4e8f69773b5593b26d6145fe8f6.bindPopup(popup_bf4affae0f89026cd8040627feb63c9c)
+        ;
+
+        
+    
+    
+            circle_marker_7573c4e8f69773b5593b26d6145fe8f6.bindTooltip(
+                `<div>
+                     <b>Kerteh Petrochemical Complex</b><br>Exposed: USD 19.4B (90%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_a06dd2d578fceb9803350c206cd9e32c = L.circleMarker(
+                [5.3006, 100.29],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#E67E22", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 21.1, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_29a43f74714ede0d375cd9ae0e75860f = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_b03cfe8b7ea9deef3a5ca6406f589c0e = $(`<div id="html_b03cfe8b7ea9deef3a5ca6406f589c0e" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Bayan Lepas FIZ</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Pulau Pinang &nbsp; <b>Type:</b> E&E / Semiconductor<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 27.5 B<br>           <b>Flood depth RP100:</b> 1.20 m<br>           <b>Damage factor:</b> 65%<br>           <b>Exposed GDP (present):</b>             <span style='color:#E67E22;font-weight:bold'>               USD 17.9 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 17.9 B             (<b>+0.0 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>Reclaimed coastal land; pluvial + coastal surge risk; highest E&E export concentration in Malaysia</i>         </div>         </div>`)[0];
+                popup_29a43f74714ede0d375cd9ae0e75860f.setContent(html_b03cfe8b7ea9deef3a5ca6406f589c0e);
+            
+        
+
+        circle_marker_a06dd2d578fceb9803350c206cd9e32c.bindPopup(popup_29a43f74714ede0d375cd9ae0e75860f)
+        ;
+
+        
+    
+    
+            circle_marker_a06dd2d578fceb9803350c206cd9e32c.bindTooltip(
+                `<div>
+                     <b>Bayan Lepas FIZ</b><br>Exposed: USD 17.9B (65%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_216c214a9a4470a04eb0236d236db67f = L.circleMarker(
+                [1.363, 103.546],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#E67E22", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 20.0, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_7af4054ca7e6de91fc4cf417cda3313c = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_9f9a29668e87799bbb7c7368d1457f5b = $(`<div id="html_9f9a29668e87799bbb7c7368d1457f5b" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Port of Tanjung Pelepas (PTP)</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Johor &nbsp; <b>Type:</b> Port / Logistics<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 25.0 B<br>           <b>Flood depth RP100:</b> 1.90 m<br>           <b>Damage factor:</b> 65%<br>           <b>Exposed GDP (present):</b>             <span style='color:#E67E22;font-weight:bold'>               USD 16.2 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 22.5 B             (<b>+6.2 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>Major transhipment hub; coastal tidal; projected jump to 90% damage band under 2050 SLR (+USD 6.2B)</i>         </div>         </div>`)[0];
+                popup_7af4054ca7e6de91fc4cf417cda3313c.setContent(html_9f9a29668e87799bbb7c7368d1457f5b);
+            
+        
+
+        circle_marker_216c214a9a4470a04eb0236d236db67f.bindPopup(popup_7af4054ca7e6de91fc4cf417cda3313c)
+        ;
+
+        
+    
+    
+            circle_marker_216c214a9a4470a04eb0236d236db67f.bindTooltip(
+                `<div>
+                     <b>Port of Tanjung Pelepas (PTP)</b><br>Exposed: USD 16.2B (65%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_ca1d43aaa907228cf8dca3e4b1d5899f = L.circleMarker(
+                [5.3646, 100.3962],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#E67E22", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 14.5, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_1d85089f53a8d530c46d409766c1b91f = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_6003125f2b1f085c3d051870df8ca425 = $(`<div id="html_6003125f2b1f085c3d051870df8ca425" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Perai (Prai) FIZ</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Pulau Pinang &nbsp; <b>Type:</b> Manufacturing / E&E<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 12.5 B<br>           <b>Flood depth RP100:</b> 1.10 m<br>           <b>Damage factor:</b> 65%<br>           <b>Exposed GDP (present):</b>             <span style='color:#E67E22;font-weight:bold'>               USD 8.1 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 8.1 B             (<b>+0.0 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>Sg Perai riverine + coastal; mixed manufacturing corridor</i>         </div>         </div>`)[0];
+                popup_1d85089f53a8d530c46d409766c1b91f.setContent(html_6003125f2b1f085c3d051870df8ca425);
+            
+        
+
+        circle_marker_ca1d43aaa907228cf8dca3e4b1d5899f.bindPopup(popup_1d85089f53a8d530c46d409766c1b91f)
+        ;
+
+        
+    
+    
+            circle_marker_ca1d43aaa907228cf8dca3e4b1d5899f.bindTooltip(
+                `<div>
+                     <b>Perai (Prai) FIZ</b><br>Exposed: USD 8.1B (65%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_683c2a71f41cf69075ccaa8b6be45bcb = L.circleMarker(
+                [5.38, 100.56],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#F1C40F", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 15.6, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_40e3266af870db1c9e94d72efdc64358 = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_7cba1ca611c016d437386d1509d4d073 = $(`<div id="html_7cba1ca611c016d437386d1509d4d073" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Kulim Hi-Tech Park</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Kedah &nbsp; <b>Type:</b> Hi-tech manufacturing<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 15.0 B<br>           <b>Flood depth RP100:</b> 0.80 m<br>           <b>Damage factor:</b> 35%<br>           <b>Exposed GDP (present):</b>             <span style='color:#F1C40F;font-weight:bold'>               USD 5.2 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 9.8 B             (<b>+4.5 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>Inland riverine; semiconductor wafer fabs; shifts to higher damage band by 2050 (worst-case Δ in portfolio)</i>         </div>         </div>`)[0];
+                popup_40e3266af870db1c9e94d72efdc64358.setContent(html_7cba1ca611c016d437386d1509d4d073);
+            
+        
+
+        circle_marker_683c2a71f41cf69075ccaa8b6be45bcb.bindPopup(popup_40e3266af870db1c9e94d72efdc64358)
+        ;
+
+        
+    
+    
+            circle_marker_683c2a71f41cf69075ccaa8b6be45bcb.bindTooltip(
+                `<div>
+                     <b>Kulim Hi-Tech Park</b><br>Exposed: USD 5.2B (35%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var circle_marker_bb0089c9e4c8e6443c19d265d5a1f6a7 = L.circleMarker(
+                [2.261, 102.267],
+                {"bubblingMouseEvents": true, "color": "white", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#E67E22", "fillOpacity": 0.87, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 11.86, "stroke": true, "weight": 2}
+            ).addTo(feature_group_fcfb473624f4e6fa6389f0773ddf2235);
+        
+    
+        var popup_62836f8a05c9eed199a7ad96b1e89a48 = L.popup({
+  "maxWidth": 310,
+});
+
+        
+            
+                var html_1bc58791a5c9c027830fb582914b8119 = $(`<div id="html_1bc58791a5c9c027830fb582914b8119" style="width: 100.0%; height: 100.0%;">         <div style='font-family:Arial;font-size:12px;width:290px'>           <b style='font-size:14px'>Batu Berendam FTZ</b><br>           <hr style='margin:4px 0'>           <b>State:</b> Melaka &nbsp; <b>Type:</b> Trade / Logistics / Aerospace MRO<br>           <hr style='margin:4px 0'>           <b>Total GDP (buffer):</b> USD 6.5 B<br>           <b>Flood depth RP100:</b> 1.00 m<br>           <b>Damage factor:</b> 65%<br>           <b>Exposed GDP (present):</b>             <span style='color:#E67E22;font-weight:bold'>               USD 4.2 B</span><br>           <b>Exposed GDP (2050 RCP8.5):</b>             USD 4.2 B             (<b>+0.0 B Δ</b>)<br>           <hr style='margin:4px 0'>           <i style='color:#777;font-size:11px'>Riverine + coastal; aerospace MRO cluster</i>         </div>         </div>`)[0];
+                popup_62836f8a05c9eed199a7ad96b1e89a48.setContent(html_1bc58791a5c9c027830fb582914b8119);
+            
+        
+
+        circle_marker_bb0089c9e4c8e6443c19d265d5a1f6a7.bindPopup(popup_62836f8a05c9eed199a7ad96b1e89a48)
+        ;
+
+        
+    
+    
+            circle_marker_bb0089c9e4c8e6443c19d265d5a1f6a7.bindTooltip(
+                `<div>
+                     <b>Batu Berendam FTZ</b><br>Exposed: USD 4.2B (65%)
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            feature_group_fcfb473624f4e6fa6389f0773ddf2235.addTo(map_6b1569ea2b0308f04d39066f6d6d6b78);
+        
+    
+            var layer_control_1f2b24a4fb0b424be0d926e41f510ee5_layers = {
+                base_layers : {
+                    "cartodbpositron" : tile_layer_4d09083e884663a8a7303f96d9fa8f09,
+                },
+                overlays :  {
+                    "Industrial Clusters" : feature_group_fcfb473624f4e6fa6389f0773ddf2235,
+                },
+            };
+            let layer_control_1f2b24a4fb0b424be0d926e41f510ee5 = L.control.layers(
+                layer_control_1f2b24a4fb0b424be0d926e41f510ee5_layers.base_layers,
+                layer_control_1f2b24a4fb0b424be0d926e41f510ee5_layers.overlays,
+                {
+  "position": "topright",
+  "collapsed": true,
+  "autoZIndex": true,
+}
+            ).addTo(map_6b1569ea2b0308f04d39066f6d6d6b78);
+
+        
+</script>
+</html>
