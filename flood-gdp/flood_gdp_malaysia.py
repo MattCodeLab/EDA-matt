@@ -742,8 +742,15 @@ FLOOD_CMAP = mc.LinearSegmentedColormap.from_list(
 
 
 def _plot_map_panel(ax, bbox, adm0, adm1, flood_depth, flood_tfm,
-                    exposure_df, show_labels=True):
-    """Draw one map panel (works with regular matplotlib Axes)."""
+                    exposure_df, show_labels=True,
+                    flood_style: str = "fill", show_gdp: bool = True):
+    """Draw one map panel (works with regular matplotlib Axes).
+
+    flood_style : 'fill'    semi-transparent raster overlay
+                  'contour' contour lines at 0.5 / 1.0 / 2.0 m + light fill
+                  'none'    no flood layer
+    show_gdp    : if False, draw flat neutral land instead of GDP choropleth
+    """
     lon_min, lat_min, lon_max, lat_max = bbox
     clip_box = box(lon_min, lat_min, lon_max, lat_max)
 
@@ -754,12 +761,12 @@ def _plot_map_panel(ax, bbox, adm0, adm1, flood_depth, flood_tfm,
     ax.tick_params(left=False, bottom=False,
                    labelleft=False, labelbottom=False)
 
-    # — GDP choropleth —
+    # — GDP choropleth or flat land —
     has_states = "NAME_1" in adm1.columns and adm1["NAME_1"].nunique() > 1
     gdp_vals = list(STATE_GDP_PPP_B_USD.values())
     gdp_norm = mc.LogNorm(vmin=max(1, min(gdp_vals)), vmax=max(gdp_vals))
 
-    if has_states:
+    if show_gdp and has_states:
         adm1_c = adm1.copy()
         if "gdp_b" not in adm1_c.columns:
             adm1_c["gdp_b"] = adm1_c["NAME_1"].map(STATE_GDP_PPP_B_USD).fillna(0)
@@ -773,43 +780,64 @@ def _plot_map_panel(ax, bbox, adm0, adm1, flood_depth, flood_tfm,
             missing_kwds={"color": LAND_CLR, "alpha": 0.72},
         )
     else:
+        adm1_c = adm1.copy()
         try:
-            adm0.clip(clip_box).plot(
-                ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.6,
-            )
+            adm1_c = adm1_c.clip(clip_box)
         except Exception:
-            adm0.plot(ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.6)
+            pass
+        try:
+            adm1_c.plot(ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.45)
+        except Exception:
+            try:
+                adm0.clip(clip_box).plot(
+                    ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.6)
+            except Exception:
+                adm0.plot(ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.6)
 
     # — Flood depth overlay —
-    if flood_depth is not None:
+    if flood_depth is not None and flood_style != "none":
         try:
             nrows, ncols = flood_depth.shape
             fl_lon0 = flood_tfm.c
             fl_lat1 = flood_tfm.f
-            fl_res  = flood_tfm.a
-            fl_lon1 = fl_lon0 + ncols * fl_res
-            fl_lat0 = fl_lat1 + nrows * flood_tfm.e
+            fl_res  = flood_tfm.a      # positive (east)
+            fl_lres = flood_tfm.e      # negative (south)
 
-            # Clip indices to panel
+            # Clip raster indices to panel bbox
             c0 = max(0, int((lon_min - fl_lon0) / fl_res))
             c1 = min(ncols, int((lon_max - fl_lon0) / fl_res) + 1)
-            r0 = max(0, int((fl_lat1 - lat_max) / (-flood_tfm.e)))
-            r1 = min(nrows, int((fl_lat1 - lat_min) / (-flood_tfm.e)) + 1)
+            r0 = max(0, int((fl_lat1 - lat_max) / (-fl_lres)))
+            r1 = min(nrows, int((fl_lat1 - lat_min) / (-fl_lres)) + 1)
             sub = flood_depth[r0:r1, c0:c1]
-            extent = [
-                fl_lon0 + c0 * fl_res,
-                fl_lon0 + c1 * fl_res,
-                fl_lat1 + r1 * flood_tfm.e,
-                fl_lat1 + r0 * flood_tfm.e,
-            ]
-            masked = np.ma.masked_less_equal(sub, 0.05)
-            ax.imshow(
-                masked, extent=extent, origin="upper",
-                cmap=FLOOD_CMAP, norm=mc.Normalize(vmin=0, vmax=3.5),
-                alpha=0.62, zorder=2, aspect="auto",
-            )
+
+            if flood_style == "fill":
+                extent = [
+                    fl_lon0 + c0 * fl_res,
+                    fl_lon0 + c1 * fl_res,
+                    fl_lat1 + r1 * fl_lres,
+                    fl_lat1 + r0 * fl_lres,
+                ]
+                masked = np.ma.masked_less_equal(sub, 0.05)
+                ax.imshow(
+                    masked, extent=extent, origin="upper",
+                    cmap=FLOOD_CMAP, norm=mc.Normalize(vmin=0, vmax=3.5),
+                    alpha=0.40, zorder=2, aspect="auto",
+                )
+            elif flood_style == "contour":
+                # Cell-centre coordinate arrays
+                lons = fl_lon0 + (np.arange(c0, c1) + 0.5) * fl_res
+                lats = fl_lat1 + (np.arange(r0, r1) + 0.5) * fl_lres
+                X, Y = np.meshgrid(lons, lats)
+                # Light filled bands so the underlying choropleth shows through
+                fill_lvls = [0.3, 0.5, 1.0, 1.5, 2.0, 2.5, 3.5]
+                ax.contourf(X, Y, sub, levels=fill_lvls,
+                            cmap=FLOOD_CMAP, alpha=0.22, zorder=2)
+                # Bold contour lines at key depth thresholds
+                ax.contour(X, Y, sub, levels=[0.5, 1.0, 2.0],
+                           colors=["#4BABDB", "#1565C0", "#0A3D62"],
+                           linewidths=[0.9, 1.4, 1.8], alpha=0.88, zorder=3)
         except Exception as e:
-            log.debug(f"Flood overlay error: {e}")
+            log.debug(f"Flood overlay error ({flood_style}): {e}")
 
     # — Cluster markers —
     top5_ids = exposure_df.head(5)["id"].tolist()
@@ -985,6 +1013,193 @@ def create_static_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
     fig.savefig(out, dpi=180, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     log.info(f"  Static map → {out}")
+    return out
+
+
+# ===========================================================================
+# ▌ FULL MALAYSIA MAP (no table, flood as contour lines)
+# ===========================================================================
+
+def create_full_malaysia_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
+                              flood_label: str) -> Path:
+    """Single A3 image: Peninsular + East Malaysia side-by-side, no table.
+
+    Flood is rendered as contour lines (0.5 / 1.0 / 2.0 m) so the GDP
+    choropleth remains fully readable underneath.
+    """
+    fig = plt.figure(figsize=(22, 10), facecolor="white")
+    gs  = GridSpec(1, 3, figure=fig,
+                   left=0.02, right=0.99, bottom=0.09, top=0.90,
+                   wspace=0.04,
+                   width_ratios=[1.35, 1.50, 0.28])
+
+    ax_pen  = fig.add_subplot(gs[0, 0])
+    ax_east = fig.add_subplot(gs[0, 1])
+    ax_leg  = fig.add_subplot(gs[0, 2])
+
+    # — Peninsular Malaysia —
+    _plot_map_panel(ax_pen, PENINSULAR_BBOX, adm0, adm1,
+                    flood_depth, flood_tfm, exposure_df,
+                    show_labels=True, flood_style="contour", show_gdp=True)
+    ax_pen.set_title("Peninsular Malaysia",
+                     fontsize=11, fontweight="bold", color="#2C3E50", pad=5)
+
+    # — East Malaysia —
+    _plot_map_panel(ax_east, EAST_MY_BBOX, adm0, adm1,
+                    flood_depth, flood_tfm, exposure_df,
+                    show_labels=True, flood_style="contour", show_gdp=True)
+    ax_east.set_title("East Malaysia — Sabah & Sarawak",
+                      fontsize=11, fontweight="bold", color="#2C3E50", pad=5)
+
+    # — Legend panel —
+    ax_leg.set_facecolor("#FAFAFA")
+    for sp in ax_leg.spines.values():
+        sp.set_edgecolor("#CCCCCC"); sp.set_linewidth(0.6)
+    ax_leg.set_xlim(0, 1); ax_leg.set_ylim(0, 1)
+    ax_leg.tick_params(left=False, bottom=False,
+                       labelleft=False, labelbottom=False)
+
+    cluster_handles = [
+        mpatches.Patch(fc="#C0392B", ec="white", label="Exposure ≥85%"),
+        mpatches.Patch(fc="#E67E22", ec="white", label="60–85%"),
+        mpatches.Patch(fc="#F1C40F", ec="white", label="30–60%"),
+        mpatches.Patch(fc="#27AE60", ec="white", label="<30%"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="#888",
+               markersize=8, label="Cluster (size ∝ GDP)"),
+        Line2D([0], [0], marker="*", color="w", markerfacecolor="white",
+               markeredgecolor="#555", markersize=9, label="★  Top-5"),
+    ]
+    flood_handles = [
+        Line2D([0], [0], color="#4BABDB", linewidth=1.8, label="0.5 m contour"),
+        Line2D([0], [0], color="#1565C0", linewidth=2.2, label="1.0 m contour"),
+        Line2D([0], [0], color="#0A3D62", linewidth=2.6, label="2.0 m contour"),
+    ]
+    ax_leg.legend(handles=cluster_handles + flood_handles, loc="upper left",
+                  fontsize=8, framealpha=0.0, handlelength=1.6, handleheight=1.4,
+                  borderpad=0.8, labelspacing=0.80,
+                  title="Legend", title_fontsize=9)
+    ax_leg.text(
+        0.04, 0.06,
+        f"RP{HEADLINE_RP} present\n+ 2050 RCP8.5\n"
+        f"Flood: {flood_label[:30]}\n"
+        "GDP: DOSM 2022\n10 km cluster buffer",
+        fontsize=6.8, color="#666", va="bottom",
+        transform=ax_leg.transAxes, linespacing=1.5,
+    )
+
+    # — Colorbars along the bottom —
+    gdp_vals = list(STATE_GDP_PPP_B_USD.values())
+    gdp_norm = mc.LogNorm(vmin=max(1, min(gdp_vals)), vmax=max(gdp_vals))
+
+    cax1 = fig.add_axes([0.03, 0.022, 0.22, 0.025])
+    cb1  = ColorbarBase(cax1, cmap=GDP_CMAP, norm=gdp_norm, orientation="horizontal")
+    cb1.ax.set_xlabel("State GDP (USD B PPP 2022)", fontsize=7, color="#444")
+    cb1.ax.xaxis.set_tick_params(labelsize=6.5, colors="#444")
+
+    cax2 = fig.add_axes([0.31, 0.022, 0.22, 0.025])
+    cb2  = ColorbarBase(cax2, cmap=FLOOD_CMAP,
+                        norm=mc.Normalize(vmin=0, vmax=4.0), orientation="horizontal")
+    cb2.ax.set_xlabel("Flood depth RP100 (m)", fontsize=7, color="#444")
+    cb2.ax.xaxis.set_tick_params(labelsize=6.5, colors="#444")
+
+    # — Titles —
+    fig.text(0.5, 0.960,
+             f"Malaysia  Flood Hazard × GDP Exposure × Industrial Clusters   (RP{HEADLINE_RP})",
+             ha="center", va="top", fontsize=14, fontweight="bold", color="#2C3E50")
+    fig.text(0.5, 0.935,
+             "GDP choropleth (YlOrRd) · Flood shown as depth contour lines "
+             "(0.5 m / 1.0 m / 2.0 m) · Cluster markers coloured by exposure share",
+             ha="center", va="top", fontsize=8, color="#555")
+    fig.text(
+        0.5, 0.012,
+        "⚠ PROTOTYPE — synthetic flood model; GDP uniformly distributed within states. "
+        "Upgrade: Fathom 3.0 (30 m) + DID basin data before capex decisions.",
+        ha="center", va="bottom", fontsize=6.5, color="#AA4444", style="italic",
+    )
+
+    out = OUTPUT_DIR / "malaysia_map_full.png"
+    fig.savefig(out, dpi=180, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    log.info(f"  Full Malaysia map → {out}")
+    return out
+
+
+# ===========================================================================
+# ▌ SPLIT MAPS (GDP-only | Flood-only | Combined)
+# ===========================================================================
+
+def create_split_maps(adm0, adm1, exposure_df, flood_depth, flood_tfm,
+                      flood_label: str) -> Path:
+    """3-panel split for Peninsular Malaysia:
+      A – GDP choropleth only (no flood)
+      B – Flood depth only   (no GDP, filled raster)
+      C – Combined           (GDP + contour flood lines + cluster labels)
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(24, 9), facecolor="white")
+    fig.subplots_adjust(left=0.01, right=0.99, bottom=0.11, top=0.88, wspace=0.05)
+
+    BBOX = PENINSULAR_BBOX
+
+    panel_cfg = [
+        dict(flood_style="none",    show_gdp=True,  show_labels=False),
+        dict(flood_style="fill",    show_gdp=False, show_labels=False),
+        dict(flood_style="contour", show_gdp=True,  show_labels=True),
+    ]
+    panel_titles = [
+        "A  GDP Exposure by State",
+        "B  Flood Depth  RP100",
+        "C  Combined — Flood × GDP × Clusters",
+    ]
+
+    for ax, title, kw in zip(axes, panel_titles, panel_cfg):
+        _plot_map_panel(ax, BBOX, adm0, adm1, flood_depth, flood_tfm,
+                        exposure_df, **kw)
+        ax.set_title(title, fontsize=11, fontweight="bold", color="#2C3E50", pad=5)
+
+    # GDP colorbar (under panel A)
+    gdp_vals = list(STATE_GDP_PPP_B_USD.values())
+    gdp_norm = mc.LogNorm(vmin=max(1, min(gdp_vals)), vmax=max(gdp_vals))
+    cax1 = fig.add_axes([0.01, 0.035, 0.28, 0.022])
+    cb1  = ColorbarBase(cax1, cmap=GDP_CMAP, norm=gdp_norm, orientation="horizontal")
+    cb1.ax.set_xlabel("State GDP (USD B PPP 2022)", fontsize=7.5, color="#444")
+    cb1.ax.xaxis.set_tick_params(labelsize=7, colors="#444")
+
+    # Flood depth colorbar (under panel B)
+    cax2 = fig.add_axes([0.355, 0.035, 0.28, 0.022])
+    cb2  = ColorbarBase(cax2, cmap=FLOOD_CMAP,
+                        norm=mc.Normalize(vmin=0, vmax=4.0), orientation="horizontal")
+    cb2.ax.set_xlabel("Flood depth RP100 (m)", fontsize=7.5, color="#444")
+    cb2.ax.xaxis.set_tick_params(labelsize=7, colors="#444")
+
+    # Exposure + contour legend (under panel C)
+    cax3 = fig.add_axes([0.71, 0.005, 0.28, 0.090])
+    cax3.set_axis_off()
+    leg_handles = [
+        mpatches.Patch(fc="#C0392B", ec="white", label="Exposure ≥85%"),
+        mpatches.Patch(fc="#E67E22", ec="white", label="Exposure 60–85%"),
+        mpatches.Patch(fc="#F1C40F", ec="white", label="Exposure 30–60%"),
+        mpatches.Patch(fc="#27AE60", ec="white", label="Exposure <30%"),
+        Line2D([0], [0], color="#4BABDB", linewidth=1.8, label="0.5 m flood line"),
+        Line2D([0], [0], color="#1565C0", linewidth=2.2, label="1.0 m flood line"),
+        Line2D([0], [0], color="#0A3D62", linewidth=2.6, label="2.0 m flood line"),
+    ]
+    cax3.legend(handles=leg_handles, loc="center", fontsize=8,
+                framealpha=0.0, ncol=2, handlelength=1.6, handleheight=1.2,
+                borderpad=0.5, labelspacing=0.55)
+
+    # Titles
+    fig.text(0.5, 0.960,
+             f"Malaysia Industrial Flood Exposure — Split View   (RP{HEADLINE_RP})",
+             ha="center", va="top", fontsize=14, fontweight="bold", color="#2C3E50")
+    fig.text(0.5, 0.935,
+             f"Peninsular Malaysia · Flood: {flood_label} · "
+             "Cluster markers coloured by damage-band exposure share",
+             ha="center", va="top", fontsize=8, color="#555")
+
+    out = OUTPUT_DIR / "malaysia_map_split.png"
+    fig.savefig(out, dpi=160, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    log.info(f"  Split maps → {out}")
     return out
 
 
@@ -1321,9 +1536,11 @@ def main():
 
     # 5. Visualisations
     log.info("\n[5/6] Generating visualisations …")
-    map_path  = create_static_map(adm0, adm1, exposure_df, flood_arr, flood_tfm, flood_label)
-    tbl_path  = create_table_figure(exposure_df)
-    html_path = create_interactive_map(exposure_df, flood_arr, flood_tfm, flood_label)
+    map_path   = create_static_map(adm0, adm1, exposure_df, flood_arr, flood_tfm, flood_label)
+    full_path  = create_full_malaysia_map(adm0, adm1, exposure_df, flood_arr, flood_tfm, flood_label)
+    split_path = create_split_maps(adm0, adm1, exposure_df, flood_arr, flood_tfm, flood_label)
+    tbl_path   = create_table_figure(exposure_df)
+    html_path  = create_interactive_map(exposure_df, flood_arr, flood_tfm, flood_label)
 
     # 6. Callouts
     log.info("\n[6/6] Priority callouts …")
@@ -1332,7 +1549,7 @@ def main():
     log.info("\n" + "=" * 60)
     log.info("ALL OUTPUTS")
     log.info("=" * 60)
-    for p in [map_path, html_path, tbl_path, csv_out, txt_path]:
+    for p in [map_path, full_path, split_path, html_path, tbl_path, csv_out, txt_path]:
         log.info(f"  {p}")
     log.info("=" * 60)
 
