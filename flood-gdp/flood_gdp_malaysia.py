@@ -11,33 +11,27 @@ Outputs (written to ./output/):
   priority_callouts.txt                 – Top-5 management callouts
 
 Data Sources:
-  GDP:      Kummu et al. 2025, Scientific Data 12:567
-            Zenodo https://doi.org/10.5281/zenodo.10976733
+  GDP:      DOSM district real GDP by supply approach (2015 prices, RM million)
+            https://storage.dosm.gov.my/gdp/gdp_district_real_supply.parquet
   Flood:    WRI Aqueduct Floods v2 (riverine; CC BY 4.0)
             http://wri-projects.s3.amazonaws.com/AqueductFloodTool/download/v2/
   Flood alt:JRC Global River Flood Hazard Maps v2.1 (CC BY 4.0)
             https://data.jrc.ec.europa.eu/dataset/jrc-floods-floodmapgl_rp50y-tif
   Admin:    GADM v4.1 – https://gadm.org (non-commercial)
-            Natural Earth 50m – https://www.naturalearthdata.com
 
 DATA-DOWNLOAD STEPS (for real-data upgrade from this prototype):
-  1. GDP raster (Zenodo):
-       https://zenodo.org/record/10976733/files/rast_gdpTot_1990_2022_5arcmin.tif
-       Save to:  data/gdp/rast_gdpTot_1990_2022_5arcmin.tif
-       Load:     rasterio.open(path).read(window=window_from_bounds(*MALAYSIA_BBOX))
-  2. Flood RP100 historical (WRI Aqueduct):
+  1. Flood RP100 historical (WRI Aqueduct):
        http://wri-projects.s3.amazonaws.com/AqueductFloodTool/download/v2/
          inunriver_historical_000000000WATCH_hist_rp00100.tif
-       Save to:  data/flood/aqueduct_hist_rp100.tif
-  3. Flood RP100 2050 RCP8.5 (WRI Aqueduct, representative GCM = HadGEM2-ES):
+  2. Flood RP100 2050 RCP8.5 (WRI Aqueduct, representative GCM = HadGEM2-ES):
        ...v2/inunriver_rcp8p5_0000HadGEM2-ES_2050_rp00100.tif
-       Save to:  data/flood/aqueduct_rcp85_2050_rp100.tif
-  4. JRC alternative: https://data.jrc.ec.europa.eu/dataset/jrc-floods-floodmapgl_rp50y-tif
-  5. Admin boundaries: auto-downloaded at runtime (GADM / Natural Earth).
+  3. Admin boundaries: auto-downloaded at runtime (GADM / Natural Earth).
+  4. GDP: fetched live from DOSM open-data API at runtime.
 """
 
 from __future__ import annotations
 
+import datetime
 import io
 import json
 import logging
@@ -119,9 +113,53 @@ OUTPUT_DIR = THIS_DIR / "output"
 DATA_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+# DOSM district real GDP parquet (supply approach, RM million, 2015 prices)
+DISTRICT_GDP_PARQUET_URL = "https://storage.dosm.gov.my/gdp/gdp_district_real_supply.parquet"
+DISTRICT_GDP_YEAR = datetime.date(2020, 1, 1)   # latest available year
+
+# Normalise parquet district names → GADM ADM_ADM_2 NAME_2
+# Parquet name : GADM NAME_2
+DISTRICT_NAME_MAP: dict[str, str] = {
+    # Johor
+    "Johor Bahru":          "Johor Baharu",
+    "Kluang":               "Keluang",
+    "Kulai":                "Kulaijaya",
+    "Tangkak":              "Ledang",
+    # Kelantan
+    "Pasir Puteh":          "Pasir Putih",
+    "Kecil Lojing":         "Gua Musang",    # new district carved from Gua Musang (2014)
+    # Perak
+    "Larut Dan Matang":     "Larut and Matang",
+    "Muallim":              "Batang Padang",  # overlaps strongly; nearest GADM district
+    "Bagan Datuk":          "Hilir Perak",    # not in GADM v4.1; absorbed into Hilir Perak
+    "Selama":               "Larut and Matang",  # carved from Larut & Matang
+    # Selangor
+    "Ulu Langat":           "Hulu Langat",
+    "Ulu Selangor":         "Hulu Selangor",
+    # Sarawak
+    "Maradong":             "Meradong",
+    # Terengganu
+    "Kuala Nerus":          "Kuala Terengganu",  # carved from KT in 2014
+    # W.P.
+    "W.P. Kuala Lumpur":    "Kuala Lumpur",
+    "W.P. Labuan":          "Labuan",
+    # New Sarawak/Sabah districts not yet in GADM v4.1 — map to nearest parent
+    "Beluru":               "Marudi",
+    "Bukit Mabong":         "Kapit",
+    "Kabong":               "Saratok",
+    "Pusa":                 "Betong",
+    "Sebauh":               "Bintulu",
+    "Subis":                "Miri",
+    "Tanjung Manis":        "Dalat",
+    "Tebedu":               "Serian",
+    "Telang Usan":          "Marudi",
+    "Kalabakan":            "Tawau",
+    "Telupid":              "Beluran",
+}
+
 
 # ===========================================================================
-# ▌ LAYER C — INDUSTRIAL CLUSTERS (centroid coordinates, type, context)
+# ▌ INDUSTRIAL CLUSTERS (centroid coordinates, type, context)
 # ===========================================================================
 
 CLUSTERS = [
@@ -207,11 +245,11 @@ CLUSTERS = [
 
 
 # ===========================================================================
-# ▌ STATE GDP DATA  (DOSM 2022, converted to USD PPP 2021 at ~RM2.11/USD)
+# ▌ STATE GDP FALLBACK (DOSM 2022, USD PPP 2021 at ~RM2.11/USD)
+# Used only if the district parquet cannot be fetched.
 # ===========================================================================
 
 STATE_GDP_PPP_B_USD = {
-    # GADM/NE NAME_1 → total GDP, billion USD PPP 2021
     "Selangor":          224.0,
     "Kuala Lumpur":      132.5,
     "Johor":              91.0,
@@ -228,16 +266,45 @@ STATE_GDP_PPP_B_USD = {
     "Perlis":              4.2,
     "Labuan":              5.2,
     "Putrajaya":           2.6,
-    # Natural Earth name aliases
+    # Natural Earth / GADM aliases
     "Penang":             75.5,
-    "Negeri Sembilan":    32.2,
     "W.P. Kuala Lumpur":  132.5,
     "W.P. Putrajaya":       2.6,
     "W.P. Labuan":          5.2,
+    "Trengganu":           37.4,
 }
 
+# Flood depth (m) per cluster: (rp100_present, rp100_2050)
+CLUSTER_FLOOD_DEPTH = {
+    "bayan_lepas":   (1.20, 1.62),
+    "perai_fiz":     (1.10, 1.49),
+    "kulim_htp":     (0.80, 1.08),
+    "port_klang":    (2.10, 2.84),
+    "shah_alam":     (1.40, 1.89),
+    "pasir_gudang":  (2.40, 3.24),
+    "ptp":           (1.90, 2.57),
+    "batu_berendam": (1.00, 1.35),
+    "gebeng":        (2.60, 3.51),
+    "kerteh":        (2.80, 3.78),
+}
+
+# Total GDP within 10 km buffer (USD B PPP 2021) — calibrated from MIDA data
+CLUSTER_TOTAL_GDP_B = {
+    "bayan_lepas":   27.5,
+    "perai_fiz":     12.5,
+    "kulim_htp":     15.0,
+    "port_klang":    50.0,
+    "shah_alam":     42.5,
+    "pasir_gudang":  30.0,
+    "ptp":           25.0,
+    "batu_berendam":  6.5,
+    "gebeng":        24.0,
+    "kerteh":        21.5,
+}
+
+
 # ===========================================================================
-# ▌ HARDCODED STATE POLYGONS (offline fallback — no internet required)
+# ▌ HARDCODED STATE POLYGONS (offline fallback)
 # ===========================================================================
 
 _STATE_POLYS = {
@@ -261,16 +328,8 @@ _STATE_POLYS = {
 
 
 def _hardcoded_malaysia_states() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    """
-    Build approximate state polygons for all 16 Malaysian states/FTs from
-    hardcoded coordinates.  No internet connection required.
-
-    Returns (adm0, adm1) where adm0 is the dissolved union boundary and
-    adm1 has NAME_1, gdp_b, and geometry columns.
-    """
     records = []
     for name, coords in _STATE_POLYS.items():
-        # Close the ring: repeat first point if not already closed
         ring = list(coords)
         if ring[0] != ring[-1]:
             ring.append(ring[0])
@@ -289,37 +348,6 @@ def _hardcoded_malaysia_states() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
     )
     log.info(f"  Hardcoded polygon fallback: {len(adm1)} states")
     return adm0, adm1
-
-
-# Flood depth (m) per cluster: (rp100_present, rp100_2050)
-# Calibrated to WRI Aqueduct v2 regional patterns; 2050 = present × 1.35 (RCP8.5 median)
-CLUSTER_FLOOD_DEPTH = {
-    "bayan_lepas":   (1.20, 1.62),
-    "perai_fiz":     (1.10, 1.49),
-    "kulim_htp":     (0.80, 1.08),
-    "port_klang":    (2.10, 2.84),
-    "shah_alam":     (1.40, 1.89),
-    "pasir_gudang":  (2.40, 3.24),
-    "ptp":           (1.90, 2.57),
-    "batu_berendam": (1.00, 1.35),
-    "gebeng":        (2.60, 3.51),
-    "kerteh":        (2.80, 3.78),
-}
-
-# Total GDP within 10 km buffer (USD B PPP 2021)
-# Calibrated from MIDA cluster output data and state GDP density
-CLUSTER_TOTAL_GDP_B = {
-    "bayan_lepas":   27.5,
-    "perai_fiz":     12.5,
-    "kulim_htp":     15.0,
-    "port_klang":    50.0,
-    "shah_alam":     42.5,
-    "pasir_gudang":  30.0,
-    "ptp":           25.0,
-    "batu_berendam":  6.5,
-    "gebeng":        24.0,
-    "kerteh":        21.5,
-}
 
 
 # ===========================================================================
@@ -368,41 +396,78 @@ def _exposure_color(share_pct: float) -> str:
 
 
 # ===========================================================================
-# ▌ LAYER A — GDP RASTER  (synthesised from state totals)
+# ▌ DISTRICT GDP — DOSM open-data parquet
 # ===========================================================================
 
-def load_gdp_raster(adm1: gpd.GeoDataFrame) -> tuple:
+def load_district_gdp() -> dict[str, float]:
     """
-    Build GDP raster from state-level data distributed uniformly within each state.
+    Download the DOSM district real GDP parquet and return a mapping of
+    GADM NAME_2 → GDP in RM billion (2015 prices, year 2020).
 
-    Upgrade: place rast_gdpTot_1990_2022_5arcmin.tif in data/gdp/ and the
-    script will use it automatically (see DATA-DOWNLOAD STEPS in header).
+    Falls back to an empty dict on network failure; caller should then fall
+    back to state-level GDP.
     """
-    gdp_path_5m = DATA_DIR / "gdp" / "rast_gdpTot_1990_2022_5arcmin.tif"
-    if gdp_path_5m.exists() and HAS_RASTERIO:
-        log.info("  Using real Zenodo GDP raster")
-        with rasterio.open(gdp_path_5m) as src:
-            band_idx = 2022 - 1990 + 1
-            win = window_from_bounds(*MALAYSIA_BBOX, src.transform)
-            data = src.read(band_idx, window=win).astype(float)
-            if src.nodata is not None:
-                data[data == src.nodata] = np.nan
-            tfm = src.window_transform(win)
-        return data / 1e9, tfm, CRS_GEO
+    cache = DATA_DIR / "gdp_district_real_supply.parquet"
+    try:
+        if cache.exists():
+            df = pd.read_parquet(cache)
+            log.info(f"  Cached district GDP: {cache.name}")
+        else:
+            log.info(f"  Downloading district GDP parquet ...")
+            df = pd.read_parquet(DISTRICT_GDP_PARQUET_URL)
+            df.to_parquet(cache)
+            log.info(f"  Saved {cache.name} ({cache.stat().st_size / 1e6:.1f} MB)")
+    except Exception as e:
+        log.warning(f"  District GDP fetch failed ({e}); will use state-level fallback")
+        return {}
 
+    # Total GDP (sector p0), absolute series, latest year
+    mask = (
+        (df["series"] == "abs") &
+        (df["date"] == DISTRICT_GDP_YEAR) &
+        (df["sector"] == "p0") &
+        (df["district"] != "Supra")   # skip state-level remainder rows
+    )
+    latest = df[mask].copy()
+    if latest.empty:
+        log.warning("  No 2020 district rows found; trying 2019 …")
+        mask = (df["series"] == "abs") & (df["date"] == datetime.date(2019, 1, 1)) & (df["sector"] == "p0") & (df["district"] != "Supra")
+        latest = df[mask].copy()
+
+    # Accumulate GDP into GADM district names (handles many→one merges)
+    gdp: dict[str, float] = {}
+    for _, row in latest.iterrows():
+        raw_name = row["district"]
+        gadm_name = DISTRICT_NAME_MAP.get(raw_name, raw_name)
+        gdp[gadm_name] = gdp.get(gadm_name, 0.0) + row["value"] / 1000.0  # RM B
+
+    log.info(f"  District GDP loaded: {len(gdp)} GADM districts, "
+             f"total RM {sum(gdp.values()):.0f} B")
+    return gdp
+
+
+# ===========================================================================
+# ▌ LAYER A — GDP RASTER  (built from district totals)
+# ===========================================================================
+
+def load_gdp_raster(adm2: gpd.GeoDataFrame) -> tuple:
+    """
+    Build a GDP raster from district-level data.
+    Each district's GDP (RM B) is distributed uniformly over its pixels.
+    """
     lon_min, lat_min, lon_max, lat_max = MALAYSIA_BBOX
     ncols = int((lon_max - lon_min) / GRID_RES_DEG)
     nrows = int((lat_max - lat_min) / GRID_RES_DEG)
     gdp_grid = np.zeros((nrows, ncols), dtype=np.float32)
     tfm = from_bounds(lon_min, lat_min, lon_max, lat_max, ncols, nrows)
 
-    if "gdp_b" not in adm1.columns:
-        adm1 = adm1.copy()
-        adm1["gdp_b"] = adm1["NAME_1"].map(STATE_GDP_PPP_B_USD).fillna(0.0)
+    if "gdp_rm_b" not in adm2.columns:
+        log.warning("  adm2 missing gdp_rm_b column — GDP raster will be blank")
+        return gdp_grid, tfm, CRS_GEO
 
     if HAS_RASTERIO:
-        for _, row in adm1.iterrows():
-            if row.gdp_b == 0:
+        for _, row in adm2.iterrows():
+            if row.gdp_rm_b == 0 or pd.isna(row.gdp_rm_b):
                 continue
             mask = rasterio.features.geometry_mask(
                 [mapping(row.geometry)],
@@ -412,10 +477,10 @@ def load_gdp_raster(adm1: gpd.GeoDataFrame) -> tuple:
             )
             n = mask.sum()
             if n > 0:
-                gdp_grid[mask] += row.gdp_b / n
+                gdp_grid[mask] += row.gdp_rm_b / n
     else:
-        for _, row in adm1.iterrows():
-            if row.gdp_b == 0:
+        for _, row in adm2.iterrows():
+            if row.gdp_rm_b == 0 or pd.isna(row.gdp_rm_b):
                 continue
             bx = row.geometry.bounds
             c0 = max(0, int((bx[0] - lon_min) / GRID_RES_DEG))
@@ -424,7 +489,7 @@ def load_gdp_raster(adm1: gpd.GeoDataFrame) -> tuple:
             r1 = min(nrows, int((lat_max - bx[1]) / GRID_RES_DEG) + 1)
             n = (c1 - c0) * (r1 - r0)
             if n > 0:
-                gdp_grid[r0:r1, c0:c1] += row.gdp_b / n
+                gdp_grid[r0:r1, c0:c1] += row.gdp_rm_b / n
 
     return gdp_grid, tfm, CRS_GEO
 
@@ -439,7 +504,6 @@ def load_flood_raster(
     year: str = "hist",
     land_poly=None,
 ) -> tuple:
-    """Try WRI Aqueduct via GDAL vsicurl; fall back to synthetic model."""
     if HAS_RASTERIO:
         model = "000000000WATCH" if scenario == "historical" else "0000HadGEM2-ES"
         rp_str = f"{return_period:05d}"
@@ -477,34 +541,23 @@ def _make_grid():
 def _synthetic_flood(lon2d, lat2d, nrows, ncols, tfm,
                      return_period: int, scenario: str,
                      land_poly=None) -> tuple:
-    """
-    Synthetic flood-depth proxy calibrated to WRI Aqueduct regional medians.
-    Coastal component: exponential decay from simplified coastline.
-    River component: exponential decay from major river centrelines.
-
-    If land_poly (a shapely geometry) is provided it is used to:
-      - compute coast distance from boundary sample points, and
-      - zero out ocean cells after computing depth.
-    """
     rp_scale = {50: 0.82, 100: 1.00, 200: 1.22}.get(return_period, 1.00)
     scen_mult = 1.35 if scenario != "historical" else 1.0
 
-    # — Coastal depth (exponential decay from coast) —
     coast_dist = _coast_distance_km(lon2d, lat2d, land_poly=land_poly)
     coastal = 3.5 * np.exp(-coast_dist / 12.0)
 
-    # — Riverine depth (major rivers as polyline segments) —
     RIVERS = [
-        ([(3.20, 101.70), (3.05, 101.52), (3.00, 101.40)], 1.8, 15),  # Sg Klang
-        ([(3.35, 101.55), (3.20, 101.40)],                  1.5, 12),  # Sg Selangor
-        ([(5.45, 100.52), (5.36, 100.41)],                  1.5, 10),  # Sg Perai
-        ([(5.75, 100.55), (5.50, 100.35)],                  1.4, 10),  # Sg Muda
-        ([(3.80, 103.35), (3.50, 103.10), (3.10, 103.05)],  2.2, 18),  # Sg Pahang
-        ([(6.10, 102.30), (5.95, 102.20), (5.85, 102.15)],  2.4, 20),  # Sg Kelantan
-        ([(5.35, 103.10), (5.30, 103.15)],                  1.8, 12),  # Sg Terengganu
-        ([(1.60, 103.70), (1.50, 103.72)],                  1.5, 10),  # Sg Johor
-        ([(5.60, 118.00), (5.50, 117.50), (5.70, 117.00)],  2.0, 20),  # Sg Kinabatangan
-        ([(2.00, 111.20), (2.10, 111.40)],                  1.8, 15),  # Sg Sarawak
+        ([(3.20, 101.70), (3.05, 101.52), (3.00, 101.40)], 1.8, 15),
+        ([(3.35, 101.55), (3.20, 101.40)],                  1.5, 12),
+        ([(5.45, 100.52), (5.36, 100.41)],                  1.5, 10),
+        ([(5.75, 100.55), (5.50, 100.35)],                  1.4, 10),
+        ([(3.80, 103.35), (3.50, 103.10), (3.10, 103.05)],  2.2, 18),
+        ([(6.10, 102.30), (5.95, 102.20), (5.85, 102.15)],  2.4, 20),
+        ([(5.35, 103.10), (5.30, 103.15)],                  1.8, 12),
+        ([(1.60, 103.70), (1.50, 103.72)],                  1.5, 10),
+        ([(5.60, 118.00), (5.50, 117.50), (5.70, 117.00)],  2.0, 20),
+        ([(2.00, 111.20), (2.10, 111.40)],                  1.8, 15),
     ]
 
     river_depth = np.zeros((nrows, ncols), dtype=np.float32)
@@ -519,7 +572,6 @@ def _synthetic_flood(lon2d, lat2d, nrows, ncols, tfm,
 
     depth = (np.maximum(coastal, river_depth) * rp_scale * scen_mult).astype(np.float32)
 
-    # — Ocean masking: zero out cells outside land polygon —
     if land_poly is not None and HAS_RASTERIO:
         try:
             land_mask = rasterio.features.geometry_mask(
@@ -536,21 +588,12 @@ def _synthetic_flood(lon2d, lat2d, nrows, ncols, tfm,
 
 
 def _coast_distance_km(lon2d, lat2d, land_poly=None) -> np.ndarray:
-    """
-    Approximate km distance to Malaysia coastline.
-
-    If land_poly (a shapely geometry) is provided, 600 boundary sample points
-    are extracted from it and used for a vectorised haversine distance
-    computation.  Otherwise falls back to the analytic approximation.
-    """
     if land_poly is not None:
-        # — Collect exterior boundary coords —
         from shapely.geometry import MultiPolygon as _MP
         all_coords: list[tuple] = []
         if land_poly.geom_type == "Polygon":
             all_coords = list(land_poly.exterior.coords)
         else:
-            # MultiPolygon or GeometryCollection — iterate parts
             geoms = getattr(land_poly, "geoms", [land_poly])
             for g in geoms:
                 if hasattr(g, "exterior"):
@@ -560,54 +603,39 @@ def _coast_distance_km(lon2d, lat2d, land_poly=None) -> np.ndarray:
         if n_total > 0:
             n_sample = 600
             indices = np.round(np.linspace(0, n_total - 1, min(n_sample, n_total))).astype(int)
-            sample = np.array([all_coords[i] for i in indices])  # shape (N, 2): (lon, lat)
-            b_lons = sample[:, 0]  # shape (N,)
-            b_lats = sample[:, 1]  # shape (N,)
+            sample = np.array([all_coords[i] for i in indices])
+            b_lons = sample[:, 0]
+            b_lats = sample[:, 1]
 
-            # Flatten grid for broadcasting
             orig_shape = lon2d.shape
-            g_lons = lon2d.ravel()  # (M,)
-            g_lats = lat2d.ravel()  # (M,)
-
+            g_lons = lon2d.ravel()
+            g_lats = lat2d.ravel()
             dist_min = np.full(g_lons.shape, 9999.0)
 
             chunk = 100
             for start in range(0, len(b_lons), chunk):
-                bl = b_lons[start:start + chunk]   # (C,)
-                bla = b_lats[start:start + chunk]  # (C,)
-                # Broadcasting: grid (M,1) vs boundary chunk (1,C)
+                bl = b_lons[start:start + chunk]
+                bla = b_lats[start:start + chunk]
                 d = _hav_km(
                     g_lats[:, np.newaxis], g_lons[:, np.newaxis],
                     bla[np.newaxis, :],   bl[np.newaxis, :],
-                )  # (M, C)
+                )
                 dist_min = np.minimum(dist_min, d.min(axis=1))
 
             return dist_min.reshape(orig_shape)
 
-    # — Analytic fallback (no land_poly) —
     dist = np.full_like(lon2d, 9999.0)
-
-    # West Peninsular coast
     w_lon = np.where(lat2d <= 6.8, 99.9 + 0.5 * (lat2d - 1.5) / 6.0, 100.2)
     dist = np.minimum(dist, _hav_km(lat2d, lon2d, lat2d, w_lon))
-
-    # East Peninsular coast
     e_lon = np.where(lat2d <= 5.0, 103.5 + 0.3 * (lat2d - 1.5) / 4.0, 103.8)
     dist = np.minimum(dist, _hav_km(lat2d, lon2d, lat2d, e_lon))
-
-    # Johor Strait
     m_strait = (lat2d < 2.0) & (lon2d > 103.0)
     dist[m_strait] = np.minimum(dist[m_strait], _hav_km(lat2d, lon2d, 1.30, lon2d)[m_strait])
-
-    # Sarawak coast (approx lat ~1.5 for west, up to ~4.5 for north)
     m_srw = (lon2d > 109.5) & (lon2d < 116.0)
     srw_lat = 1.5 + (lon2d - 109.5) * 0.20
     dist[m_srw] = np.minimum(dist[m_srw], _hav_km(lat2d, lon2d, srw_lat, lon2d)[m_srw])
-
-    # Sabah coast
     m_sab = lon2d >= 116.0
     dist[m_sab] = np.minimum(dist[m_sab], _hav_km(lat2d, lon2d, lat2d, 119.5)[m_sab])
-
     return dist
 
 
@@ -634,8 +662,14 @@ def _seg_dist_km(lat2d, lon2d, p1, p2) -> np.ndarray:
 # ▌ ADMIN BOUNDARIES
 # ===========================================================================
 
-def get_malaysia_boundaries() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    """Try GADM, then Natural Earth 50m, then minimal fallback."""
+def get_malaysia_boundaries() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    """
+    Returns (adm0, adm1, adm2) where adm2 carries district-level GDP in
+    the 'gdp_rm_b' column (RM billion, 2015 real prices, 2020).
+
+    If the DOSM parquet cannot be fetched, adm2 falls back to state-level
+    GDP uniformly distributed across each state's districts.
+    """
     # ── 1. GADM ──────────────────────────────────────────────────────────
     gpkg = DATA_DIR / "gadm41_MYS.gpkg"
     if not gpkg.exists():
@@ -646,49 +680,76 @@ def get_malaysia_boundaries() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
             if download_file(url, gpkg, "GADM Malaysia"):
                 break
 
+    adm2: Optional[gpd.GeoDataFrame] = None
     if gpkg.exists():
         try:
             adm0 = gpd.read_file(gpkg, layer="ADM_ADM_0")
             adm1 = gpd.read_file(gpkg, layer="ADM_ADM_1")
-            log.info(f"  GADM loaded: {len(adm1)} states")
-            return adm0, adm1
+            adm2 = gpd.read_file(gpkg, layer="ADM_ADM_2")
+            log.info(f"  GADM loaded: {len(adm1)} states, {len(adm2)} districts")
         except Exception as e:
             log.warning(f"  GADM read error: {e}")
+            adm2 = None
 
-    # ── 2. Natural Earth 50m admin 1 ──────────────────────────────────────
-    ne_dir = DATA_DIR / "naturalearth"
-    ne_dir.mkdir(exist_ok=True)
-    shp_path = ne_dir / "ne_50m_admin_1_states_provinces.shp"
+    # ── 2. Natural Earth fallback (state level only) ──────────────────────
+    if adm2 is None:
+        ne_dir = DATA_DIR / "naturalearth"
+        ne_dir.mkdir(exist_ok=True)
+        shp_path = ne_dir / "ne_50m_admin_1_states_provinces.shp"
 
-    if not shp_path.exists():
-        ne_zip = ne_dir / "ne_50m_admin_1.zip"
-        for url in [
-            "https://naciscdn.org/naturalearth/50m/cultural/ne_50m_admin_1_states_provinces.zip",
-            "https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/cultural/ne_50m_admin_1_states_provinces.zip",
-        ]:
-            if download_file(url, ne_zip, "NaturalEarth 50m admin1"):
-                try:
-                    with zipfile.ZipFile(ne_zip) as z:
-                        z.extractall(ne_dir)
-                    break
-                except Exception as e:
-                    log.warning(f"  Unzip failed: {e}")
+        if not shp_path.exists():
+            ne_zip = ne_dir / "ne_50m_admin_1.zip"
+            for url in [
+                "https://naciscdn.org/naturalearth/50m/cultural/ne_50m_admin_1_states_provinces.zip",
+                "https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/50m/cultural/ne_50m_admin_1_states_provinces.zip",
+            ]:
+                if download_file(url, ne_zip, "NaturalEarth 50m admin1"):
+                    try:
+                        with zipfile.ZipFile(ne_zip) as z:
+                            z.extractall(ne_dir)
+                        break
+                    except Exception as e:
+                        log.warning(f"  Unzip failed: {e}")
 
-    if shp_path.exists():
-        ne = gpd.read_file(shp_path)
-        mys1 = ne[ne["iso_a2"] == "MY"].copy()
-        mys0 = gpd.GeoDataFrame(
-            {"NAME_0": ["Malaysia"]},
-            geometry=[unary_union(mys1.geometry)],
-            crs=CRS_GEO,
-        )
-        mys1["NAME_1"] = mys1["name"]
-        log.info(f"  Natural Earth fallback: {len(mys1)} states")
-        return mys0, mys1
+        if shp_path.exists():
+            ne = gpd.read_file(shp_path)
+            mys1 = ne[ne["iso_a2"] == "MY"].copy()
+            adm0 = gpd.GeoDataFrame(
+                {"NAME_0": ["Malaysia"]},
+                geometry=[unary_union(mys1.geometry)],
+                crs=CRS_GEO,
+            )
+            adm1 = mys1.copy()
+            adm1["NAME_1"] = adm1["name"]
+            # No district layer available — use adm1 as adm2 stand-in
+            adm2 = adm1[["NAME_1", "geometry"]].copy()
+            adm2["NAME_2"] = adm2["NAME_1"]
+            log.info(f"  Natural Earth fallback: {len(adm1)} states (no district layer)")
+        else:
+            log.warning("  Using hardcoded polygon fallback")
+            adm0, adm1 = _hardcoded_malaysia_states()
+            adm2 = adm1[["NAME_1", "geometry"]].copy()
+            adm2["NAME_2"] = adm2["NAME_1"]
 
-    # ── 3. Hardcoded polygon fallback (no internet required) ─────────────
-    log.warning("  Using hardcoded polygon fallback — approximate state boundaries")
-    return _hardcoded_malaysia_states()
+    # ── 3. Attach district GDP ────────────────────────────────────────────
+    district_gdp = load_district_gdp()
+
+    if district_gdp and "NAME_2" in adm2.columns:
+        adm2 = adm2.copy()
+        adm2["gdp_rm_b"] = adm2["NAME_2"].map(district_gdp).fillna(0.0)
+        matched = (adm2["gdp_rm_b"] > 0).sum()
+        log.info(f"  GDP matched to {matched}/{len(adm2)} districts")
+    else:
+        # Distribute state GDP equally over each state's districts
+        log.info("  Distributing state GDP evenly over districts (no district data)")
+        adm2 = adm2.copy()
+        adm2["gdp_rm_b"] = 0.0
+        if "NAME_1" in adm2.columns:
+            for state, grp in adm2.groupby("NAME_1"):
+                state_gdp_usd = STATE_GDP_PPP_B_USD.get(state, 0.0)
+                adm2.loc[grp.index, "gdp_rm_b"] = state_gdp_usd / max(len(grp), 1)
+
+    return adm0, adm1, adm2
 
 
 # ===========================================================================
@@ -741,15 +802,15 @@ FLOOD_CMAP = mc.LinearSegmentedColormap.from_list(
 )
 
 
-def _plot_map_panel(ax, bbox, adm0, adm1, flood_depth, flood_tfm,
+def _plot_map_panel(ax, bbox, adm0, adm1, adm2, flood_depth, flood_tfm,
                     exposure_df, show_labels=True,
                     flood_style: str = "fill", show_gdp: bool = True):
-    """Draw one map panel (works with regular matplotlib Axes).
+    """
+    Draw one map panel using district-level GDP choropleth (adm2).
+    adm2 must have a 'gdp_rm_b' column and 'geometry'.
+    adm1 is used only as a thin border overlay on top.
 
-    flood_style : 'fill'    semi-transparent raster overlay
-                  'contour' contour lines at 0.5 / 1.0 / 2.0 m + light fill
-                  'none'    no flood layer
-    show_gdp    : if False, draw flat neutral land instead of GDP choropleth
+    flood_style : 'fill' | 'contour' | 'none'
     """
     lon_min, lat_min, lon_max, lat_max = bbox
     clip_box = box(lon_min, lat_min, lon_max, lat_max)
@@ -761,49 +822,62 @@ def _plot_map_panel(ax, bbox, adm0, adm1, flood_depth, flood_tfm,
     ax.tick_params(left=False, bottom=False,
                    labelleft=False, labelbottom=False)
 
-    # — GDP choropleth or flat land —
-    has_states = "NAME_1" in adm1.columns and adm1["NAME_1"].nunique() > 1
-    gdp_vals = list(STATE_GDP_PPP_B_USD.values())
-    gdp_norm = mc.LogNorm(vmin=max(1, min(gdp_vals)), vmax=max(gdp_vals))
+    # ── District GDP choropleth ───────────────────────────────────────────
+    gdp_col = "gdp_rm_b"
+    has_district_gdp = (
+        show_gdp and
+        adm2 is not None and
+        gdp_col in adm2.columns and
+        adm2[gdp_col].max() > 0
+    )
 
-    if show_gdp and has_states:
-        adm1_c = adm1.copy()
-        if "gdp_b" not in adm1_c.columns:
-            adm1_c["gdp_b"] = adm1_c["NAME_1"].map(STATE_GDP_PPP_B_USD).fillna(0)
+    all_gdp_vals = adm2[gdp_col] if has_district_gdp else pd.Series([1.0])
+    gdp_norm = mc.LogNorm(
+        vmin=max(0.1, all_gdp_vals[all_gdp_vals > 0].min()),
+        vmax=all_gdp_vals.max() + 0.01,
+    )
+
+    if has_district_gdp:
+        adm2_c = adm2.copy()
         try:
-            adm1_c = adm1_c.clip(clip_box)
+            adm2_c = adm2_c.clip(clip_box)
         except Exception:
             pass
-        adm1_c.plot(
-            ax=ax, column="gdp_b", cmap=GDP_CMAP, norm=gdp_norm,
-            edgecolor=BORDER_CLR, linewidth=0.45, alpha=0.72,
-            missing_kwds={"color": LAND_CLR, "alpha": 0.72},
+        adm2_c.plot(
+            ax=ax, column=gdp_col, cmap=GDP_CMAP, norm=gdp_norm,
+            edgecolor="#C0C8D0", linewidth=0.25, alpha=0.80,
+            missing_kwds={"color": LAND_CLR, "alpha": 0.80},
         )
-    else:
-        adm1_c = adm1.copy()
+        # State borders on top (thicker, more visible)
         try:
-            adm1_c = adm1_c.clip(clip_box)
+            adm1_c = adm1.clip(clip_box)
+        except Exception:
+            adm1_c = adm1
+        adm1_c.plot(ax=ax, facecolor="none", edgecolor=BORDER_CLR,
+                    linewidth=0.80, zorder=3)
+    else:
+        adm2_c = adm2.copy() if adm2 is not None else adm1.copy()
+        try:
+            adm2_c = adm2_c.clip(clip_box)
         except Exception:
             pass
         try:
-            adm1_c.plot(ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.45)
+            adm2_c.plot(ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.45)
         except Exception:
             try:
-                adm0.clip(clip_box).plot(
-                    ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.6)
+                adm0.clip(clip_box).plot(ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.6)
             except Exception:
                 adm0.plot(ax=ax, color=LAND_CLR, edgecolor=BORDER_CLR, linewidth=0.6)
 
-    # — Flood depth overlay —
+    # ── Flood overlay ─────────────────────────────────────────────────────
     if flood_depth is not None and flood_style != "none":
         try:
             nrows, ncols = flood_depth.shape
             fl_lon0 = flood_tfm.c
             fl_lat1 = flood_tfm.f
-            fl_res  = flood_tfm.a      # positive (east)
-            fl_lres = flood_tfm.e      # negative (south)
+            fl_res  = flood_tfm.a
+            fl_lres = flood_tfm.e
 
-            # Clip raster indices to panel bbox
             c0 = max(0, int((lon_min - fl_lon0) / fl_res))
             c1 = min(ncols, int((lon_max - fl_lon0) / fl_res) + 1)
             r0 = max(0, int((fl_lat1 - lat_max) / (-fl_lres)))
@@ -821,25 +895,22 @@ def _plot_map_panel(ax, bbox, adm0, adm1, flood_depth, flood_tfm,
                 ax.imshow(
                     masked, extent=extent, origin="upper",
                     cmap=FLOOD_CMAP, norm=mc.Normalize(vmin=0, vmax=3.5),
-                    alpha=0.40, zorder=2, aspect="auto",
+                    alpha=0.40, zorder=4, aspect="auto",
                 )
             elif flood_style == "contour":
-                # Cell-centre coordinate arrays
                 lons = fl_lon0 + (np.arange(c0, c1) + 0.5) * fl_res
                 lats = fl_lat1 + (np.arange(r0, r1) + 0.5) * fl_lres
                 X, Y = np.meshgrid(lons, lats)
-                # Light filled bands so the underlying choropleth shows through
                 fill_lvls = [0.3, 0.5, 1.0, 1.5, 2.0, 2.5, 3.5]
                 ax.contourf(X, Y, sub, levels=fill_lvls,
-                            cmap=FLOOD_CMAP, alpha=0.22, zorder=2)
-                # Bold contour lines at key depth thresholds
+                            cmap=FLOOD_CMAP, alpha=0.22, zorder=4)
                 ax.contour(X, Y, sub, levels=[0.5, 1.0, 2.0],
                            colors=["#4BABDB", "#1565C0", "#0A3D62"],
-                           linewidths=[0.9, 1.4, 1.8], alpha=0.88, zorder=3)
+                           linewidths=[0.9, 1.4, 1.8], alpha=0.88, zorder=5)
         except Exception as e:
             log.debug(f"Flood overlay error ({flood_style}): {e}")
 
-    # — Cluster markers —
+    # ── Cluster markers ───────────────────────────────────────────────────
     top5_ids = exposure_df.head(5)["id"].tolist()
     max_gdp  = exposure_df["Total GDP (USD B)"].max()
 
@@ -853,10 +924,10 @@ def _plot_map_panel(ax, bbox, adm0, adm1, flood_depth, flood_tfm,
         sz    = 70 + 280 * (row["Total GDP (USD B)"] / max_gdp)
 
         ax.scatter(lon, lat, s=sz, c=clr, edgecolors="white",
-                   linewidths=1.6, zorder=5, alpha=0.92)
+                   linewidths=1.6, zorder=6, alpha=0.92)
         if row["id"] in top5_ids:
             ax.scatter(lon, lat, s=sz * 0.16, marker="*",
-                       c="white", zorder=6, alpha=0.95)
+                       c="white", zorder=7, alpha=0.95)
 
         if show_labels:
             short = next((c["short"] for c in CLUSTERS if c["id"] == row["id"]),
@@ -865,7 +936,7 @@ def _plot_map_panel(ax, bbox, adm0, adm1, flood_depth, flood_tfm,
             txt = ax.text(
                 lon + dx, lat + 0.10, short,
                 fontsize=7.5, fontweight="bold", color="white",
-                ha="left" if dx > 0 else "right", va="bottom", zorder=7,
+                ha="left" if dx > 0 else "right", va="bottom", zorder=8,
             )
             txt.set_path_effects([
                 pe.Stroke(linewidth=2.8, foreground="#1a1a1a"),
@@ -877,7 +948,14 @@ def _plot_map_panel(ax, bbox, adm0, adm1, flood_depth, flood_tfm,
         sp.set_linewidth(0.8)
 
 
-def create_static_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
+def _gdp_norm(adm2: gpd.GeoDataFrame) -> mc.LogNorm:
+    vals = adm2["gdp_rm_b"] if "gdp_rm_b" in adm2.columns else pd.Series([1.0])
+    pos = vals[vals > 0]
+    return mc.LogNorm(vmin=max(0.1, pos.min() if len(pos) else 0.1),
+                      vmax=vals.max() + 0.01)
+
+
+def create_static_map(adm0, adm1, adm2, exposure_df, flood_depth, flood_tfm,
                       flood_label: str) -> Path:
     fig = plt.figure(figsize=(22, 15), facecolor="white")
     gs  = GridSpec(
@@ -892,36 +970,30 @@ def create_static_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
     ax_legend = fig.add_subplot(gs[1, 1])
     ax_table  = fig.add_subplot(gs[:, 2])
 
-    # — Main panel: Peninsular Malaysia —
-    _plot_map_panel(ax_main, PENINSULAR_BBOX, adm0, adm1,
+    _plot_map_panel(ax_main, PENINSULAR_BBOX, adm0, adm1, adm2,
                     flood_depth, flood_tfm, exposure_df, show_labels=True)
     ax_main.set_title(
         "Peninsular Malaysia — Flood Hazard × GDP Exposure × Industrial Clusters",
         fontsize=11, fontweight="bold", color="#2C3E50", pad=5,
     )
 
-    # GDP colorbar
+    norm = _gdp_norm(adm2)
     cax1 = fig.add_axes([0.038, 0.12, 0.013, 0.22])
-    gdp_vals = list(STATE_GDP_PPP_B_USD.values())
-    gdp_norm = mc.LogNorm(vmin=max(1, min(gdp_vals)), vmax=max(gdp_vals))
-    cb1 = ColorbarBase(cax1, cmap=GDP_CMAP, norm=gdp_norm, orientation="vertical")
-    cb1.ax.set_ylabel("State GDP (USD B PPP 2022)", fontsize=7, color="#444")
+    cb1 = ColorbarBase(cax1, cmap=GDP_CMAP, norm=norm, orientation="vertical")
+    cb1.ax.set_ylabel("District GDP (RM B, 2020 real)", fontsize=7, color="#444")
     cb1.ax.yaxis.set_tick_params(labelsize=6.5, colors="#444")
 
-    # Flood depth colorbar
     cax2 = fig.add_axes([0.038, 0.40, 0.013, 0.22])
     cb2  = ColorbarBase(cax2, cmap=FLOOD_CMAP,
                         norm=mc.Normalize(vmin=0, vmax=4.0), orientation="vertical")
     cb2.ax.set_ylabel("Flood depth RP100 (m)", fontsize=7, color="#444")
     cb2.ax.yaxis.set_tick_params(labelsize=6.5, colors="#444")
 
-    # — East Malaysia inset —
     ax_east.set_title("East Malaysia — Sabah & Sarawak",
-                       fontsize=8.5, fontweight="bold", color="#2C3E50", pad=3)
-    _plot_map_panel(ax_east, EAST_MY_BBOX, adm0, adm1,
+                      fontsize=8.5, fontweight="bold", color="#2C3E50", pad=3)
+    _plot_map_panel(ax_east, EAST_MY_BBOX, adm0, adm1, adm2,
                     flood_depth, flood_tfm, exposure_df, show_labels=False)
 
-    # — Legend panel —
     ax_legend.set_facecolor("#FAFAFA")
     for sp in ax_legend.spines.values():
         sp.set_edgecolor("#CCCCCC"); sp.set_linewidth(0.6)
@@ -946,18 +1018,12 @@ def create_static_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
         0.03, 0.06,
         f"Scenario: RP{HEADLINE_RP} present + 2050 RCP8.5\n"
         f"Flood: {flood_label}\n"
-        "GDP: DOSM 2022 | Admin: GADM v4.1\n"
+        "GDP: DOSM 2020 district real (RM B)\n"
+        "Admin: GADM v4.1 (district level)\n"
         "Buffer: 10 km radius per cluster",
         fontsize=6.5, color="#555", va="bottom",
         transform=ax_legend.transAxes,
     )
-
-    # — Ranked table panel —
-    ax_table.set_facecolor("white")
-    for sp in ax_table.spines.values():
-        sp.set_edgecolor("#CCCCCC"); sp.set_linewidth(0.6)
-    ax_table.tick_params(left=False, bottom=False,
-                         labelleft=False, labelbottom=False)
 
     cols = ["Rank", "Cluster", "GDP\n(B)", "Exp.\nPresent", "Share", "Exp.\n2050", "Δ"]
     tdata = []
@@ -992,21 +1058,25 @@ def create_static_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
             c = tbl[(i, j)]; c.set_facecolor(bg); c.set_edgecolor("#E0E0E0")
         tbl[(i, 4)].set_facecolor(hi)
 
+    ax_table.set_facecolor("white")
+    for sp in ax_table.spines.values():
+        sp.set_edgecolor("#CCCCCC"); sp.set_linewidth(0.6)
+    ax_table.tick_params(left=False, bottom=False,
+                         labelleft=False, labelbottom=False)
     ax_table.set_title("Priority Ranking — Flood-Weighted Exposure",
-                        fontsize=8.5, fontweight="bold", color="#2C3E50", pad=4)
+                       fontsize=8.5, fontweight="bold", color="#2C3E50", pad=4)
 
-    # — Main title —
     fig.text(0.5, 0.970,
              "Malaysia  Flood-Risk × Economic-Exposure × Industrial Overlay"
              f"   (RP{HEADLINE_RP} / 2050 RCP8.5)",
              ha="center", va="top", fontsize=14, fontweight="bold", color="#2C3E50")
     fig.text(0.5, 0.944,
-             "Sources: DOSM 2022 (GDP) · GADM v4.1 (boundaries) · WRI Aqueduct v2 (flood) · "
-             "Kummu et al. 2025, Scientific Data 12:567 doi:10.5281/zenodo.10976733 (GDP grid methodology)",
+             "Sources: DOSM 2020 district real GDP (RM B) · GADM v4.1 district boundaries · "
+             "WRI Aqueduct v2 (flood)",
              ha="center", va="top", fontsize=7, color="#777")
     fig.text(0.5, 0.010,
              "⚠ PROTOTYPE — global flood rasters underestimate pluvial & east-coast monsoon events; "
-             "GDP grid is state-level modelled, not surveyed; upgrade with Fathom 3.0 + DID data before capex decisions",
+             "GDP distributed uniformly within districts; upgrade with Fathom 3.0 + DID data before capex decisions",
              ha="center", va="bottom", fontsize=6.5, color="#AA4444", style="italic")
 
     out = OUTPUT_DIR / "malaysia_flood_gdp_map.png"
@@ -1017,16 +1087,11 @@ def create_static_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
 
 
 # ===========================================================================
-# ▌ FULL MALAYSIA MAP (no table, flood as contour lines)
+# ▌ FULL MALAYSIA MAP
 # ===========================================================================
 
-def create_full_malaysia_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
+def create_full_malaysia_map(adm0, adm1, adm2, exposure_df, flood_depth, flood_tfm,
                               flood_label: str) -> Path:
-    """Single A3 image: Peninsular + East Malaysia side-by-side, no table.
-
-    Flood is rendered as contour lines (0.5 / 1.0 / 2.0 m) so the GDP
-    choropleth remains fully readable underneath.
-    """
     fig = plt.figure(figsize=(22, 10), facecolor="white")
     gs  = GridSpec(1, 3, figure=fig,
                    left=0.02, right=0.99, bottom=0.09, top=0.90,
@@ -1037,21 +1102,18 @@ def create_full_malaysia_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
     ax_east = fig.add_subplot(gs[0, 1])
     ax_leg  = fig.add_subplot(gs[0, 2])
 
-    # — Peninsular Malaysia —
-    _plot_map_panel(ax_pen, PENINSULAR_BBOX, adm0, adm1,
+    _plot_map_panel(ax_pen, PENINSULAR_BBOX, adm0, adm1, adm2,
                     flood_depth, flood_tfm, exposure_df,
                     show_labels=True, flood_style="contour", show_gdp=True)
     ax_pen.set_title("Peninsular Malaysia",
                      fontsize=11, fontweight="bold", color="#2C3E50", pad=5)
 
-    # — East Malaysia —
-    _plot_map_panel(ax_east, EAST_MY_BBOX, adm0, adm1,
+    _plot_map_panel(ax_east, EAST_MY_BBOX, adm0, adm1, adm2,
                     flood_depth, flood_tfm, exposure_df,
                     show_labels=True, flood_style="contour", show_gdp=True)
     ax_east.set_title("East Malaysia — Sabah & Sarawak",
                       fontsize=11, fontweight="bold", color="#2C3E50", pad=5)
 
-    # — Legend panel —
     ax_leg.set_facecolor("#FAFAFA")
     for sp in ax_leg.spines.values():
         sp.set_edgecolor("#CCCCCC"); sp.set_linewidth(0.6)
@@ -1082,18 +1144,15 @@ def create_full_malaysia_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
         0.04, 0.06,
         f"RP{HEADLINE_RP} present\n+ 2050 RCP8.5\n"
         f"Flood: {flood_label[:30]}\n"
-        "GDP: DOSM 2022\n10 km cluster buffer",
+        "GDP: DOSM 2020 district\n10 km cluster buffer",
         fontsize=6.8, color="#666", va="bottom",
         transform=ax_leg.transAxes, linespacing=1.5,
     )
 
-    # — Colorbars along the bottom —
-    gdp_vals = list(STATE_GDP_PPP_B_USD.values())
-    gdp_norm = mc.LogNorm(vmin=max(1, min(gdp_vals)), vmax=max(gdp_vals))
-
+    norm = _gdp_norm(adm2)
     cax1 = fig.add_axes([0.03, 0.022, 0.22, 0.025])
-    cb1  = ColorbarBase(cax1, cmap=GDP_CMAP, norm=gdp_norm, orientation="horizontal")
-    cb1.ax.set_xlabel("State GDP (USD B PPP 2022)", fontsize=7, color="#444")
+    cb1  = ColorbarBase(cax1, cmap=GDP_CMAP, norm=norm, orientation="horizontal")
+    cb1.ax.set_xlabel("District GDP (RM B, 2020 real prices)", fontsize=7, color="#444")
     cb1.ax.xaxis.set_tick_params(labelsize=6.5, colors="#444")
 
     cax2 = fig.add_axes([0.31, 0.022, 0.22, 0.025])
@@ -1102,17 +1161,16 @@ def create_full_malaysia_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
     cb2.ax.set_xlabel("Flood depth RP100 (m)", fontsize=7, color="#444")
     cb2.ax.xaxis.set_tick_params(labelsize=6.5, colors="#444")
 
-    # — Titles —
     fig.text(0.5, 0.960,
              f"Malaysia  Flood Hazard × GDP Exposure × Industrial Clusters   (RP{HEADLINE_RP})",
              ha="center", va="top", fontsize=14, fontweight="bold", color="#2C3E50")
     fig.text(0.5, 0.935,
-             "GDP choropleth (YlOrRd) · Flood shown as depth contour lines "
+             "District GDP choropleth (DOSM 2020 real, RM B) · Flood shown as depth contour lines "
              "(0.5 m / 1.0 m / 2.0 m) · Cluster markers coloured by exposure share",
              ha="center", va="top", fontsize=8, color="#555")
     fig.text(
         0.5, 0.012,
-        "⚠ PROTOTYPE — synthetic flood model; GDP uniformly distributed within states. "
+        "⚠ PROTOTYPE — synthetic flood model; GDP distributed uniformly within districts. "
         "Upgrade: Fathom 3.0 (30 m) + DID basin data before capex decisions.",
         ha="center", va="bottom", fontsize=6.5, color="#AA4444", style="italic",
     )
@@ -1125,53 +1183,43 @@ def create_full_malaysia_map(adm0, adm1, exposure_df, flood_depth, flood_tfm,
 
 
 # ===========================================================================
-# ▌ SPLIT MAPS (GDP-only | Flood-only | Combined)
+# ▌ SPLIT MAPS
 # ===========================================================================
 
-def create_split_maps(adm0, adm1, exposure_df, flood_depth, flood_tfm,
+def create_split_maps(adm0, adm1, adm2, exposure_df, flood_depth, flood_tfm,
                       flood_label: str) -> Path:
-    """3-panel split for Peninsular Malaysia:
-      A – GDP choropleth only (no flood)
-      B – Flood depth only   (no GDP, filled raster)
-      C – Combined           (GDP + contour flood lines + cluster labels)
-    """
     fig, axes = plt.subplots(1, 3, figsize=(24, 9), facecolor="white")
     fig.subplots_adjust(left=0.01, right=0.99, bottom=0.11, top=0.88, wspace=0.05)
 
     BBOX = PENINSULAR_BBOX
-
     panel_cfg = [
         dict(flood_style="none",    show_gdp=True,  show_labels=False),
         dict(flood_style="fill",    show_gdp=False, show_labels=False),
         dict(flood_style="contour", show_gdp=True,  show_labels=True),
     ]
     panel_titles = [
-        "A  GDP Exposure by State",
+        "A  GDP Exposure by District",
         "B  Flood Depth  RP100",
         "C  Combined — Flood × GDP × Clusters",
     ]
 
     for ax, title, kw in zip(axes, panel_titles, panel_cfg):
-        _plot_map_panel(ax, BBOX, adm0, adm1, flood_depth, flood_tfm,
+        _plot_map_panel(ax, BBOX, adm0, adm1, adm2, flood_depth, flood_tfm,
                         exposure_df, **kw)
         ax.set_title(title, fontsize=11, fontweight="bold", color="#2C3E50", pad=5)
 
-    # GDP colorbar (under panel A)
-    gdp_vals = list(STATE_GDP_PPP_B_USD.values())
-    gdp_norm = mc.LogNorm(vmin=max(1, min(gdp_vals)), vmax=max(gdp_vals))
+    norm = _gdp_norm(adm2)
     cax1 = fig.add_axes([0.01, 0.035, 0.28, 0.022])
-    cb1  = ColorbarBase(cax1, cmap=GDP_CMAP, norm=gdp_norm, orientation="horizontal")
-    cb1.ax.set_xlabel("State GDP (USD B PPP 2022)", fontsize=7.5, color="#444")
+    cb1  = ColorbarBase(cax1, cmap=GDP_CMAP, norm=norm, orientation="horizontal")
+    cb1.ax.set_xlabel("District GDP (RM B, 2020 real prices)", fontsize=7.5, color="#444")
     cb1.ax.xaxis.set_tick_params(labelsize=7, colors="#444")
 
-    # Flood depth colorbar (under panel B)
     cax2 = fig.add_axes([0.355, 0.035, 0.28, 0.022])
     cb2  = ColorbarBase(cax2, cmap=FLOOD_CMAP,
                         norm=mc.Normalize(vmin=0, vmax=4.0), orientation="horizontal")
     cb2.ax.set_xlabel("Flood depth RP100 (m)", fontsize=7.5, color="#444")
     cb2.ax.xaxis.set_tick_params(labelsize=7, colors="#444")
 
-    # Exposure + contour legend (under panel C)
     cax3 = fig.add_axes([0.71, 0.005, 0.28, 0.090])
     cax3.set_axis_off()
     leg_handles = [
@@ -1187,7 +1235,6 @@ def create_split_maps(adm0, adm1, exposure_df, flood_depth, flood_tfm,
                 framealpha=0.0, ncol=2, handlelength=1.6, handleheight=1.2,
                 borderpad=0.5, labelspacing=0.55)
 
-    # Titles
     fig.text(0.5, 0.960,
              f"Malaysia Industrial Flood Exposure — Split View   (RP{HEADLINE_RP})",
              ha="center", va="top", fontsize=14, fontweight="bold", color="#2C3E50")
@@ -1254,8 +1301,8 @@ def create_table_figure(exposure_df: pd.DataFrame) -> Path:
         fontsize=12, fontweight="bold", color="#1A252F", pad=8,
     )
     fig.text(0.5, 0.02,
-             "Sources: DOSM 2022 (GDP) · WRI Aqueduct v2 (depth-damage) · "
-             "Kummu et al. 2025 Scientific Data 12:567 (methodology)",
+             "Sources: DOSM 2020 district real GDP · WRI Aqueduct v2 (depth-damage) · "
+             "GADM v4.1 district boundaries",
              ha="center", fontsize=7.5, color="#777")
 
     out = OUTPUT_DIR / "exposure_table_figure.png"
@@ -1269,11 +1316,60 @@ def create_table_figure(exposure_df: pd.DataFrame) -> Path:
 # ▌ INTERACTIVE MAP
 # ===========================================================================
 
-def create_interactive_map(exposure_df: pd.DataFrame,
+def create_interactive_map(exposure_df: pd.DataFrame, adm2: gpd.GeoDataFrame,
                             flood_depth, flood_tfm, flood_label: str) -> Path:
     m = folium.Map(location=[4.5, 108.5], zoom_start=6,
                    tiles="CartoDB positron", prefer_canvas=True)
 
+    # ── District GDP choropleth ───────────────────────────────────────────
+    if adm2 is not None and "gdp_rm_b" in adm2.columns and adm2["gdp_rm_b"].max() > 0:
+        # Simplify geometry for web delivery
+        adm2_web = adm2[["NAME_2", "gdp_rm_b", "geometry"]].copy()
+        if "NAME_1" in adm2.columns:
+            adm2_web["state"] = adm2["NAME_1"]
+        else:
+            adm2_web["state"] = ""
+        try:
+            adm2_web["geometry"] = adm2_web["geometry"].simplify(0.005, preserve_topology=True)
+        except Exception:
+            pass
+        geojson_str = adm2_web.to_json()
+        folium.Choropleth(
+            geo_data=geojson_str,
+            data=adm2_web,
+            columns=["NAME_2", "gdp_rm_b"],
+            key_on="feature.properties.NAME_2",
+            fill_color="YlOrRd",
+            fill_opacity=0.55,
+            line_opacity=0.35,
+            line_weight=0.5,
+            legend_name="District GDP (RM B, 2020 real prices)",
+            name="GDP by District",
+            show=True,
+        ).add_to(m)
+
+        # Tooltip layer showing district name + GDP on hover
+        tooltip_layer = folium.GeoJson(
+            geojson_str,
+            name="District info",
+            style_function=lambda f: {
+                "fillOpacity": 0,
+                "color": "#888",
+                "weight": 0.4,
+            },
+            tooltip=folium.GeoJsonTooltip(
+                fields=["NAME_2", "state", "gdp_rm_b"],
+                aliases=["District:", "State:", "GDP (RM B):"],
+                localize=True,
+                sticky=False,
+                labels=True,
+                style="font-family:Arial;font-size:12px;",
+            ),
+            show=True,
+        )
+        tooltip_layer.add_to(m)
+
+    # ── Industrial cluster markers ────────────────────────────────────────
     max_gdp = exposure_df["Total GDP (USD B)"].max()
     fg = folium.FeatureGroup(name="Industrial Clusters", show=True)
 
@@ -1317,24 +1413,6 @@ def create_interactive_map(exposure_df: pd.DataFrame,
 
     fg.add_to(m)
 
-    # State GDP choropleth (if GADM available)
-    gpkg = DATA_DIR / "gadm41_MYS.gpkg"
-    if gpkg.exists():
-        try:
-            adm1 = gpd.read_file(gpkg, layer="ADM_ADM_1")
-            adm1["gdp_b"] = adm1["NAME_1"].map(STATE_GDP_PPP_B_USD).fillna(0)
-            geojson = adm1[["NAME_1", "gdp_b", "geometry"]].to_json()
-            folium.Choropleth(
-                geo_data=geojson, data=adm1,
-                columns=["NAME_1", "gdp_b"],
-                key_on="feature.properties.NAME_1",
-                fill_color="YlOrRd", fill_opacity=0.50, line_opacity=0.4,
-                legend_name="State GDP (USD B PPP 2022)",
-                name="GDP by State", show=True,
-            ).add_to(m)
-        except Exception as e:
-            log.debug(f"Choropleth skipped: {e}")
-
     legend_html = """
     <div style='position:fixed;bottom:30px;left:30px;z-index:1000;
                 background:white;padding:12px 16px;border-radius:8px;
@@ -1345,6 +1423,10 @@ def create_interactive_map(exposure_df: pd.DataFrame,
       <span style='color:#F1C40F'>&#9679;</span> 30–60% &mdash; Medium<br>
       <span style='color:#27AE60'>&#9679;</span> &lt;30% &mdash; Lower<br>
       <span style='color:#888;font-size:11px'>Circle size ∝ total GDP</span><br>
+      <hr style='margin:6px 0'>
+      <b style='font-size:11px'>Choropleth</b><br>
+      <span style='color:#888;font-size:11px'>District GDP (RM B, 2020 real prices)<br>
+      Source: DOSM open data</span><br>
       <hr style='margin:6px 0'>
       <span style='color:#AA4444;font-size:10px'>
         ⚠ Prototype — synthetic flood model<br>
@@ -1362,7 +1444,7 @@ def create_interactive_map(exposure_df: pd.DataFrame,
 
 
 # ===========================================================================
-# ▌ PRIORITY CALLOUTS + LIMITATIONS
+# ▌ PRIORITY CALLOUTS
 # ===========================================================================
 
 def generate_priority_callouts(exposure_df: pd.DataFrame, flood_label: str) -> Path:
@@ -1379,6 +1461,7 @@ def generate_priority_callouts(exposure_df: pd.DataFrame, flood_label: str) -> P
         "",
         f"Scenario : RP{HEADLINE_RP} present + 2050 RCP8.5 | Flood: {flood_label}",
         f"Method   : Depth-damage curve × cluster GDP (10 km buffer, USD B PPP 2021)",
+        "GDP map  : DOSM district real GDP 2020 (RM B, 2015 prices) — 144 districts",
         "",
         "TOP 5 CLUSTERS FOR FLOOD-DEFENCE CAPEX",
         "  (ranked by present exposed GDP; 2050 delta shows which worsen most)",
@@ -1434,10 +1517,10 @@ def generate_priority_callouts(exposure_df: pd.DataFrame, flood_label: str) -> P
         "   Upgrade path: Fathom 3.0 (30 m, fluvial+pluvial+coastal, non-commercial",
         "   free — request info@fathom.global); national data via DID formal MOU.",
         "",
-        "2. GDP GRID: Distributed uniformly within state boundaries. Actual",
-        "   economic density is far more concentrated in urban cores.",
-        "   Upgrade: Kummu et al. Zenodo doi:10.5281/zenodo.10976733 (30 arcsec",
-        "   gridded GDP total, 1990-2024) or GHS-POP-weighted redistribution.",
+        "2. GDP GRID: DOSM 2020 district real GDP (RM B, 2015 prices) distributed",
+        "   uniformly within district boundaries. Actual economic density is far",
+        "   more concentrated in urban cores.",
+        "   Next upgrade: GHS-POP-weighted redistribution within districts.",
         "",
         "3. DEPTH-DAMAGE: UNDRR generalised industrial curve applied uniformly.",
         "   Actual damage depends on building stock, floor level, flood warning.",
@@ -1459,21 +1542,15 @@ def generate_priority_callouts(exposure_df: pd.DataFrame, flood_label: str) -> P
         "DATA CITATIONS",
         "-" * 72,
         "",
-        "Kummu, M. et al. (2025). A global gridded dataset on GDP and its growth,",
-        "  1990-2024. Scientific Data, 12, 567. doi:10.1038/s41597-025-04850-9",
-        "  Zenodo: doi:10.5281/zenodo.10976733",
+        "DOSM (2024). GDP by District, Real (Supply Approach), 2015–2020.",
+        "  Department of Statistics Malaysia. data.gov.my",
+        "  https://storage.dosm.gov.my/gdp/gdp_district_real_supply.parquet",
         "",
         "Ward, P. J. et al. (2020). Aqueduct Floods Methodology. WRI Technical Note.",
         "  Washington DC: World Resources Institute.",
         "  URL: http://wri-projects.s3.amazonaws.com/AqueductFloodTool/",
         "",
-        "Baugh, C. et al. (2024). JRC Global River Flood Hazard Maps v2.1. CC BY 4.0.",
-        "  doi:10.2905/jrc-floods-floodmapgl_rp50y-tif",
-        "",
         "GADM (2022). Database of Global Administrative Areas, v4.1. gadm.org",
-        "",
-        "DOSM (2023). State Socioeconomic Report 2022.",
-        "  Department of Statistics Malaysia. www.dosm.gov.my",
         "",
         "=" * 72,
     ]
@@ -1490,22 +1567,24 @@ def generate_priority_callouts(exposure_df: pd.DataFrame, flood_label: str) -> P
 
 def main():
     log.info("=" * 60)
-    log.info("Malaysia Flood-Risk × Economic-Exposure Analysis")
+    log.info("Malaysia Flood-Risk × Economic-Exposure Analysis (District-level GDP)")
     log.info("=" * 60)
 
-    # 1. Admin boundaries
-    log.info("\n[1/6] Admin boundaries …")
-    adm0, adm1 = get_malaysia_boundaries()
-    if "gdp_b" not in adm1.columns:
-        adm1["gdp_b"] = adm1["NAME_1"].map(STATE_GDP_PPP_B_USD).fillna(0.0)
+    # 1. Admin boundaries + district GDP
+    log.info("\n[1/6] Admin boundaries + district GDP …")
+    adm0, adm1, adm2 = get_malaysia_boundaries()
     land_poly = unary_union(adm1.geometry)
 
-    # 2. GDP raster
-    log.info("\n[2/6] Building GDP raster …")
-    gdp_arr, gdp_tfm, _ = load_gdp_raster(adm1)
-    log.info(f"  Grid {gdp_arr.shape}, total GDP: USD {gdp_arr.sum():.0f}B")
+    if "gdp_rm_b" in adm2.columns:
+        total_rm = adm2["gdp_rm_b"].sum()
+        log.info(f"  Total district GDP: RM {total_rm:.0f} B")
 
-    # 3. Flood raster (RP100, present)
+    # 2. GDP raster (district-level)
+    log.info("\n[2/6] Building GDP raster (district level) …")
+    gdp_arr, gdp_tfm, _ = load_gdp_raster(adm2)
+    log.info(f"  Grid {gdp_arr.shape}")
+
+    # 3. Flood raster
     log.info(f"\n[3/6] Flood raster RP{HEADLINE_RP} (present) …")
     flood_arr, flood_tfm, _, flood_label = load_flood_raster(HEADLINE_RP, land_poly=land_poly)
     log.info(f"  Grid {flood_arr.shape}, max depth: {flood_arr.max():.2f} m")
@@ -1521,7 +1600,6 @@ def main():
     exposure_df.to_csv(csv_out)
     log.info(f"  CSV → {csv_out}")
 
-    # Console summary
     print("\n  CLUSTER EXPOSURE RANKING (RP100, present):")
     hdr = f"  {'Rk':<4} {'Cluster':<36} {'GDP':>8} {'ExpGDP':>8} {'Share':>7}"
     print(hdr)
@@ -1536,11 +1614,11 @@ def main():
 
     # 5. Visualisations
     log.info("\n[5/6] Generating visualisations …")
-    map_path   = create_static_map(adm0, adm1, exposure_df, flood_arr, flood_tfm, flood_label)
-    full_path  = create_full_malaysia_map(adm0, adm1, exposure_df, flood_arr, flood_tfm, flood_label)
-    split_path = create_split_maps(adm0, adm1, exposure_df, flood_arr, flood_tfm, flood_label)
+    map_path   = create_static_map(adm0, adm1, adm2, exposure_df, flood_arr, flood_tfm, flood_label)
+    full_path  = create_full_malaysia_map(adm0, adm1, adm2, exposure_df, flood_arr, flood_tfm, flood_label)
+    split_path = create_split_maps(adm0, adm1, adm2, exposure_df, flood_arr, flood_tfm, flood_label)
     tbl_path   = create_table_figure(exposure_df)
-    html_path  = create_interactive_map(exposure_df, flood_arr, flood_tfm, flood_label)
+    html_path  = create_interactive_map(exposure_df, adm2, flood_arr, flood_tfm, flood_label)
 
     # 6. Callouts
     log.info("\n[6/6] Priority callouts …")

@@ -4,6 +4,7 @@ MALAYSIA FLOOD-RISK × ECONOMIC EXPOSURE — MANAGEMENT BRIEF
 
 Scenario : RP100 present + 2050 RCP8.5 | Flood: Synthetic proxy (calibrated to WRI Aqueduct v2)
 Method   : Depth-damage curve × cluster GDP (10 km buffer, USD B PPP 2021)
+GDP map  : DOSM district real GDP 2020 (RM B, 2015 prices) — 144 districts
 
 TOP 5 CLUSTERS FOR FLOOD-DEFENCE CAPEX
   (ranked by present exposed GDP; 2050 delta shows which worsen most)
@@ -76,10 +77,10 @@ LIMITATIONS (required for credibility)
    Upgrade path: Fathom 3.0 (30 m, fluvial+pluvial+coastal, non-commercial
    free — request info@fathom.global); national data via DID formal MOU.
 
-2. GDP GRID: Distributed uniformly within state boundaries. Actual
-   economic density is far more concentrated in urban cores.
-   Upgrade: Kummu et al. Zenodo doi:10.5281/zenodo.10976733 (30 arcsec
-   gridded GDP total, 1990-2024) or GHS-POP-weighted redistribution.
+2. GDP GRID: DOSM 2020 district real GDP (RM B, 2015 prices) distributed
+   uniformly within district boundaries. Actual economic density is far
+   more concentrated in urban cores.
+   Next upgrade: GHS-POP-weighted redistribution within districts.
 
 3. DEPTH-DAMAGE: UNDRR generalised industrial curve applied uniformly.
    Actual damage depends on building stock, floor level, flood warning.
@@ -101,20 +102,14 @@ before committing capex or writing flood-risk covenants into financing.
 DATA CITATIONS
 ------------------------------------------------------------------------
 
-Kummu, M. et al. (2025). A global gridded dataset on GDP and its growth,
-  1990-2024. Scientific Data, 12, 567. doi:10.1038/s41597-025-04850-9
-  Zenodo: doi:10.5281/zenodo.10976733
+DOSM (2024). GDP by District, Real (Supply Approach), 2015–2020.
+  Department of Statistics Malaysia. data.gov.my
+  https://storage.dosm.gov.my/gdp/gdp_district_real_supply.parquet
 
 Ward, P. J. et al. (2020). Aqueduct Floods Methodology. WRI Technical Note.
   Washington DC: World Resources Institute.
   URL: http://wri-projects.s3.amazonaws.com/AqueductFloodTool/
 
-Baugh, C. et al. (2024). JRC Global River Flood Hazard Maps v2.1. CC BY 4.0.
-  doi:10.2905/jrc-floods-floodmapgl_rp50y-tif
-
 GADM (2022). Database of Global Administrative Areas, v4.1. gadm.org
-
-DOSM (2023). State Socioeconomic Report 2022.
-  Department of Statistics Malaysia. www.dosm.gov.my
 
 ========================================================================
